@@ -3,229 +3,97 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Log Smolov Jr incline sessions and copy a note for your trainer.">
+  <meta name="description" content="Log a workout on your phone and copy it into chat or Google Sheets.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0c0e12">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Incline log">
-  <title>Incline log</title>
+  <meta name="apple-mobile-web-app-title" content="Workout">
+  <title>Workout</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <script>
     if (location.protocol === "file:") document.documentElement.classList.add("file-protocol");
   </script>
 </head>
-<body>
+<body class="page-workout">
   <div class="app">
     <header class="top">
       <div class="mark" aria-hidden="true"></div>
-      <p class="eyebrow">Jackson Irby</p>
-      <h1>Incline log</h1>
-      <p class="lede" id="lede">Smolov Jr incline</p>
+      <nav class="nav" aria-label="Pages">
+        <a href="./index.html" aria-current="page">Workout</a>
+        <a href="./smolov.html">Smolov Jr</a>
+      </nav>
+      <h1>Workout</h1>
+      <p class="lede">Build the session, then copy it into chat or a sheet.</p>
     </header>
 
-    <p class="banner file-warning">Opened as a file. The form still runs. Copy works more reliably on a local server or GitHub Pages, and you can always select the message by hand.</p>
+    <p class="banner file-warning">Opened as a file. The form still runs. Copy works more reliably on a local server or GitHub Pages, and you can always select the preview by hand.</p>
+    <noscript><p class="banner">This page needs JavaScript. Nothing you type is uploaded.</p></noscript>
 
     <main class="stack">
-      <form id="session-form" class="stack" autocomplete="off">
-        <section aria-labelledby="session-label">
-          <h2 id="session-label">Session</h2>
-          <div class="choice-grid" role="group" aria-label="Session type">
-            <button type="button" class="choice" data-session="push" aria-pressed="false">
-              <span class="choice-title">Push</span>
-              <span class="choice-meta">Mon · 6×6 @ 70%</span>
-            </button>
-            <button type="button" class="choice" data-session="pull" aria-pressed="false">
-              <span class="choice-title">Pull</span>
-              <span class="choice-meta">Tue · 7×5 @ 75%</span>
-            </button>
-            <button type="button" class="choice" data-session="legs" aria-pressed="false">
-              <span class="choice-title">Legs</span>
-              <span class="choice-meta" id="legs-meta">Thu · 8×4 @ 80%</span>
-            </button>
-            <button type="button" class="choice" data-session="run" aria-pressed="false">
-              <span class="choice-title">Easy run</span>
-              <span class="choice-meta">Sat · 3–5 mi</span>
-            </button>
-          </div>
-          <p class="hint">Lifts at 6pm ET. Saturday run around 12–1pm.</p>
-        </section>
-
-        <section aria-labelledby="week-title">
-          <div class="week-nav">
-            <button type="button" class="nav-btn" id="prev-week">Prev</button>
-            <div>
-              <h2 id="week-title">Week</h2>
-              <p class="week-range" id="week-range"></p>
-            </div>
-            <button type="button" class="nav-btn" id="next-week">Next</button>
-          </div>
-          <div id="week-plan" class="choice-grid" role="group" aria-label="This week's plan"></div>
-          <div class="field">
-            <label for="date">Date</label>
+      <form id="workout-form" class="stack" autocomplete="off">
+        <section aria-labelledby="date-label">
+          <div class="field tight">
+            <label for="date" id="date-label">Date</label>
             <input id="date" name="date" type="date" required>
           </div>
-          <p class="banner" id="offday" hidden>
-            This date is off the split.
-            <button type="button" class="text-btn" id="jump-next">Go to the next session</button>
-          </p>
         </section>
 
-        <section class="card" aria-labelledby="work-label">
+        <section aria-labelledby="saved-label">
           <div class="row-between">
-            <h2 id="work-label">Incline</h2>
-            <button type="button" class="text-btn" id="match-plan" hidden>Use planned</button>
+            <h2 id="saved-label">Start from saved</h2>
           </div>
-
-          <div id="lift-fields">
-            <div class="plan">
-              <p class="kicker">Planned</p>
-              <p class="plan-figure"><span id="plan-weight">—</span> <span class="unit">lb</span></p>
-              <p class="plan-caption" id="plan-caption"></p>
-            </div>
-            <div class="nums">
-              <div>
-                <label for="weight">Weight (lb)</label>
-                <input id="weight" name="weight" type="number" inputmode="decimal" min="0" step="0.5">
-              </div>
-              <div>
-                <label for="sets">Sets</label>
-                <input id="sets" name="sets" type="number" inputmode="numeric" min="1" step="1">
-              </div>
-              <div>
-                <label for="reps">Reps</label>
-                <input id="reps" name="reps" type="number" inputmode="numeric" min="1" step="1">
-              </div>
-            </div>
-            <div class="field">
-              <label for="accessories">Accessories</label>
-              <textarea id="accessories" name="accessories" rows="2" maxlength="500" placeholder="What you added"></textarea>
-              <p class="hint" id="accessory-hint"></p>
-            </div>
-          </div>
-
-          <div id="run-fields" hidden>
-            <div class="plan">
-              <p class="kicker">Saturday easy run</p>
-              <p class="plan-figure">3–5 <span class="unit">mi</span></p>
-              <p class="plan-caption">Around 12–1pm ET. Keep it conversational.</p>
-            </div>
-            <div class="nums run-nums">
-              <div>
-                <label for="distance">Miles</label>
-                <input id="distance" name="distance" type="number" inputmode="decimal" min="0" step="0.1" placeholder="4">
-              </div>
-              <div>
-                <label for="minutes">Minutes</label>
-                <input id="minutes" name="minutes" type="number" inputmode="numeric" min="0" step="1" placeholder="38">
-              </div>
-              <div>
-                <label for="seconds">Seconds</label>
-                <input id="seconds" name="seconds" type="number" inputmode="numeric" min="0" max="59" step="1" placeholder="20">
-              </div>
-            </div>
-          </div>
+          <p class="hint" id="saved-empty">Save a workout and it shows up here. Using one copies the exercises, set counts, and last weights.</p>
+          <ul id="saved-list" class="log"></ul>
         </section>
 
-        <section aria-labelledby="felt-label">
-          <h2 id="felt-label">How it felt</h2>
-          <div class="choice-grid feel" role="group" aria-label="How it felt">
-            <button type="button" class="choice" data-feel="Easy" aria-pressed="false">Easy</button>
-            <button type="button" class="choice" data-feel="Solid" aria-pressed="false">Solid</button>
-            <button type="button" class="choice" data-feel="Grind" aria-pressed="false">Grind</button>
-            <button type="button" class="choice" data-feel="Rough" aria-pressed="false">Rough</button>
-          </div>
-          <div class="field">
-            <label for="notes">Notes</label>
-            <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="Anything to tell your trainer"></textarea>
-          </div>
-          <div class="field">
-            <p class="label" id="done-label">Done</p>
-            <div class="choice-grid" role="group" aria-labelledby="done-label">
-              <button type="button" class="choice" data-done="yes" aria-pressed="false">Yes</button>
-              <button type="button" class="choice" data-done="no" aria-pressed="false">Not yet</button>
+        <section aria-labelledby="add-label">
+          <h2 id="add-label">Add exercise</h2>
+          <div class="add-row">
+            <div>
+              <label for="exercise-pick" class="sr-only">Exercise</label>
+              <select id="exercise-pick">
+                <option value="">Choose an exercise</option>
+              </select>
             </div>
+            <button type="button" class="secondary" id="add-exercise">Add</button>
           </div>
+          <div class="field" id="custom-field" hidden>
+            <label for="custom-name">Custom name</label>
+            <input id="custom-name" type="text" maxlength="80" placeholder="Exercise name" enterkeyhint="done">
+          </div>
+          <p class="hint">Incline, dips, laterals, knee-friendly legs, pull, and a custom name. <a href="./smolov.html">Smolov Jr</a> can drop a whole day in.</p>
         </section>
 
-        <section class="message-card" aria-labelledby="message-label">
-          <h2 id="message-label">For your trainer</h2>
-          <p class="hint">Plain text. It updates as you edit.</p>
-          <pre id="message" tabindex="0" aria-label="Message to paste"></pre>
-          <button type="button" class="primary" id="copy">Copy message</button>
+        <section aria-labelledby="session-label">
+          <h2 id="session-label" class="sr-only">Exercises</h2>
+          <p class="hint" id="exercise-empty">No exercises yet.</p>
+          <div id="exercises" class="stack cards"></div>
         </section>
 
         <div class="actions">
-          <button type="button" class="secondary" id="save">Save session</button>
-          <button type="button" class="text-btn" id="new-session">Start a new session</button>
+          <button type="button" class="secondary" id="save">Save workout</button>
+          <button type="button" class="text-btn" id="clear">Clear workout</button>
         </div>
-        <p class="status" id="status" role="status"></p>
+        <p class="banner" id="storage-note" hidden>This browser is not storing data. You can still copy the workout.</p>
       </form>
-
-      <section aria-labelledby="log-heading">
-        <div class="log-head">
-          <h2 id="log-heading">On this phone</h2>
-          <button type="button" class="text-btn" id="clear-log" hidden>Clear all</button>
-        </div>
-        <p class="hint" id="log-empty">Nothing saved yet. Copy works without saving.</p>
-        <p class="banner" id="storage-note" hidden>This browser is not storing data. You can still copy the message.</p>
-        <ul id="log-list" class="log"></ul>
-      </section>
-
-      <details class="card">
-        <summary>Program and settings</summary>
-        <div class="help">
-          <p>Defaults match Jackson's incline block: training max 200 lb, plus 5 lb each week, toward a 225 lb incline.</p>
-          <div class="settings">
-            <div class="nums">
-              <div>
-                <label for="tm">Training max</label>
-                <input id="tm" type="number" inputmode="decimal" min="1" step="0.5">
-              </div>
-              <div>
-                <label for="goal">Goal</label>
-                <input id="goal" type="number" inputmode="decimal" min="1" step="1">
-              </div>
-              <div>
-                <label for="bump">+ lb / week</label>
-                <input id="bump" type="number" inputmode="decimal" min="0" step="0.5">
-              </div>
-            </div>
-            <div class="field">
-              <label for="round-to">Round working weight to</label>
-              <select id="round-to">
-                <option value="5">5 lb</option>
-                <option value="2.5">2.5 lb</option>
-                <option value="1">1 lb</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="cycle-start">Monday week 1 starts</label>
-              <input id="cycle-start" type="date">
-              <p class="hint">Pick any day in week 1. It snaps to that week's Monday. Today's date then lands on the right week.</p>
-            </div>
-            <label class="check">
-              <input id="legs-intensity" type="checkbox">
-              <span>Thursday uses optional intensity: 10×3 @ 85% instead of 8×4 @ 80%.</span>
-            </label>
-          </div>
-          <p>The week is three lift days and an easy run.</p>
-          <ul>
-            <li>Monday, 6pm ET — Smolov + push — incline 6×6 at 70%.</li>
-            <li>Tuesday, 6pm ET — Smolov + pull — incline 7×5 at 75%.</li>
-            <li>Thursday, 6pm ET — Smolov + legs — incline 8×4 at 80%.</li>
-            <li>Saturday, about 12–1pm ET — easy run, 3–5 miles.</li>
-          </ul>
-          <p>Classic Smolov Jr also has a 10×3 at 85% day. This split leaves that day out unless Thursday is set to the optional intensity above.</p>
-          <p>Leg accessories stay knee-friendly: terminal knee extensions, Spanish squats, and step-downs. The incline work is the specialization.</p>
-          <p>Working weight is that week's training max times the percentage, rounded to the nearest plate step. When rounding changes the bar weight, the plan and the copied note both show the unrounded number.</p>
-          <p>The open session is written to this browser's localStorage on each change, and the list is written when you save or remove one. Both come back after a refresh. Copy puts text on the clipboard so you can paste it into the trainer chat yourself.</p>
-        </div>
-      </details>
     </main>
 
-    <p class="foot">Nothing is uploaded. The form and the session list stay in this browser after a refresh.</p>
+    <p class="foot">Saved on this phone only. A refresh keeps the workout you are filling in.</p>
   </div>
+
+  <footer class="dock">
+    <div class="dock-inner">
+      <h2 id="preview-label">Preview</h2>
+      <pre id="message" tabindex="0" aria-labelledby="preview-label"></pre>
+      <div class="dock-actions">
+        <button type="button" class="primary" id="copy-chat">Copy for chat</button>
+        <button type="button" class="secondary" id="copy-sheets">Copy for Sheets</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+    </div>
+  </footer>
+
   <script src="./program.js"></script>
   <script src="./app.js"></script>
 </body>
