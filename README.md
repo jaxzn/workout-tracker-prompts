@@ -33,14 +33,14 @@ Select the cell where the paste should start. Tabs land in separate columns. Del
 
 ## Smolov Jr
 
-The calculator turns a training max into the week’s bar weights, rounded to the nearest 5 lb.
+The calculator turns a training max into all three weeks of Smolov Jr, rounded to the nearest 5 lb. There is no week number to type.
 
 - Day 1 — 6×6 @ 70%
 - Day 2 — 7×5 @ 75%
 - Day 3 — 8×4 @ 80%
 - Day 4 — 10×3 @ 85% (optional)
 
-The weekly bump starts at +5 lb. Leave week blank for week 1. Week 2 adds the bump once, week 3 adds it twice. The lift name defaults to incline bench. Change it if the block is for something else.
+The weekly bump starts at +5 lb. Week 1 uses the training max. Week 2 adds the bump once, week 3 adds it twice. The lift name defaults to incline bench. Change it if the block is for something else.
 
 **Add to current workout** opens the composer with that day’s sets already filled in, one row per set, ready to edit. If a workout is already on the phone, the day is added to it. **Replace current workout** asks you to confirm before it clears the other exercises. The calculator still works if you never log anything.
 
@@ -48,11 +48,11 @@ The handoff is a query string on the workout page, with the same payload in `ses
 
 ## What stays after a refresh
 
-Edits are stored in this browser. Nothing is uploaded.
+Edits are stored in this browser. Nothing is uploaded. The page uses `localStorage` first. If that throws or the write does not read back (Brave Shields or “block all cookies” does this), it uses `sessionStorage` with the same keys, so a refresh in that tab still works. If both are blocked, Save does not say it worked, and a banner tells you to allow cookies or Shields for this site. Copy still works.
 
 - The open workout, including the date and every set: `workout.draft.v1`
 - Workouts you saved for **Start from saved**: `workout.saved.v1`
-- Calculator training max, bump, week, and lift: `smolov.settings.v1`
+- Calculator training max, bump, and lift: `smolov.settings.v1`
 
 Clearing the site data for this page removes all three. The old incline-log keys are unused.
 

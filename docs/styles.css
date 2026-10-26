@@ -238,6 +238,8 @@ select {
   margin-top: 0.9rem;
 }
 
+.smolov-nums { grid-template-columns: 1fr 1fr; }
+
 .add-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -367,6 +369,54 @@ select {
   margin-top: 0.85rem;
 }
 
+.week-block + .week-block { margin-top: 0.85rem; }
+
+.week-block h3 {
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.week-days { display: grid; gap: 0.4rem; }
+
+.day-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.15rem 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.85rem;
+  box-shadow: none;
+}
+
+.day-line .plan-figure {
+  margin: 0;
+  font-size: 1.35rem;
+  text-align: right;
+}
+
+.day-line .plan-caption {
+  margin: 0.05rem 0 0;
+  font-size: 0.82rem;
+}
+
+.day-line .day-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.day-line .day-actions .primary,
+.day-line .day-actions .secondary {
+  flex: 1;
+  width: auto;
+  min-height: 2.75rem;
+}
+
 .day-actions .text-btn { justify-self: center; }
 
 .text-btn {
@@ -433,6 +483,15 @@ select {
   border: 1px solid var(--line);
   border-radius: 0.9rem;
   color: var(--ink);
+}
+
+.storage-blocked {
+  background: #3a2a12;
+  border: 2px solid var(--accent);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .file-warning { display: none; }

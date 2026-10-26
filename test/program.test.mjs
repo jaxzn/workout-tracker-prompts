@@ -26,9 +26,51 @@ const {
   normalizeDraft,
   pendingFromQuery,
   pendingToQuery,
+  createStore,
   roundToStep,
+  savedRecordContains,
+  smolovCycle,
   smolovWeek,
 } = sandbox.WorkoutProgram;
+
+function memoryStorage(initial) {
+  const data = new Map(Object.entries(initial || {}));
+  return {
+    getItem(key) {
+      return data.has(key) ? data.get(key) : null;
+    },
+    setItem(key, value) {
+      data.set(String(key), String(value));
+    },
+    removeItem(key) {
+      data.delete(key);
+    },
+  };
+}
+
+function throwingStorage() {
+  return {
+    getItem() {
+      throw new Error("blocked");
+    },
+    setItem() {
+      throw new Error("blocked");
+    },
+    removeItem() {
+      throw new Error("blocked");
+    },
+  };
+}
+
+function droppedWriteStorage() {
+  return {
+    getItem() {
+      return null;
+    },
+    setItem() {},
+    removeItem() {},
+  };
+}
 
 test("the exercise list matches the composer", () => {
   assert.deepEqual([...EXERCISES], [
@@ -212,6 +254,14 @@ test("the weekly bump stacks and a blank week stays on the base max", () => {
   assert.equal(smolovWeek({ tm: "nope", weeklyBump: -2, week: 0 }).days[2].weight, 160);
   assert.equal(roundToStep(157.5, 5), 160);
   assert.equal(roundToStep(142.5, 5), 145);
+
+  const cycle = [...smolovCycle({ tm: 200, weeklyBump: 5, lift: "Incline bench" }).weeks];
+  assert.equal(cycle.length, 3);
+  assert.equal(cycle[0].days[0].weight, 140);
+  assert.equal(cycle[1].tm, 205);
+  assert.equal(cycle[1].days[0].weight, 145);
+  assert.equal(cycle[2].tm, 210);
+  assert.equal(cycle[2].days[0].weight, 145);
 });
 
 test("adding a day appends, and replace is the only path that clears", () => {
@@ -267,4 +317,66 @@ test("the calculator handoff survives a query string", () => {
   assert.equal(pending.sets, 6);
   assert.equal(pendingFromQuery("?date=2026-10-26"), null);
   assert.equal(pendingFromQuery(pendingToQuery({ mode: "append", name: "OHP", weight: "95", reps: "8", sets: "3" })).mode, "append");
+});
+
+const savedPayload = JSON.stringify([
+  {
+    id: "id-1",
+    savedAt: "2026-10-26T00:00:00.000Z",
+    draft: {
+      date: "2026-10-26",
+      exercises: [{ name: "Incline bench", sets: [{ weight: "140", reps: "6" }] }],
+    },
+  },
+]);
+const draftPayload = JSON.stringify({
+  date: "2026-10-26",
+  savedId: "id-1",
+  exercises: [{ name: "Incline bench", sets: [{ weight: "140", reps: "6" }] }],
+});
+
+test("a save reloads from localStorage when the browser keeps it", () => {
+  const local = memoryStorage();
+  const session = memoryStorage();
+  const store = createStore({ localStorage: local, sessionStorage: session });
+  assert.equal(store.set("workout.draft.v1", draftPayload), true);
+  assert.equal(store.set("workout.saved.v1", savedPayload), true);
+  assert.equal(store.kind(), "local");
+  const reloaded = createStore({ localStorage: local, sessionStorage: session });
+  assert.equal(reloaded.get("workout.draft.v1"), draftPayload);
+  assert.equal(savedRecordContains(reloaded.get("workout.saved.v1"), "id-1"), true);
+  assert.equal(session.getItem("workout.saved.v1"), null);
+});
+
+test("blocked localStorage falls back to sessionStorage with the same keys", () => {
+  const session = memoryStorage();
+  const store = createStore({ localStorage: throwingStorage(), sessionStorage: session });
+  assert.equal(store.set("workout.draft.v1", draftPayload), true);
+  assert.equal(store.set("workout.saved.v1", savedPayload), true);
+  assert.equal(store.kind(), "session");
+  const reloaded = createStore({ localStorage: throwingStorage(), sessionStorage: session });
+  assert.equal(reloaded.get("workout.draft.v1"), draftPayload);
+  assert.equal(savedRecordContains(reloaded.get("workout.saved.v1"), "id-1"), true);
+  assert.equal(reloaded.kind(), "session");
+});
+
+test("a local write that does not round-trip falls back to sessionStorage", () => {
+  const session = memoryStorage();
+  const store = createStore({ localStorage: droppedWriteStorage(), sessionStorage: session });
+  assert.equal(store.set("workout.saved.v1", savedPayload), true);
+  assert.equal(store.kind(), "session");
+  assert.equal(savedRecordContains(session.getItem("workout.saved.v1"), "id-1"), true);
+});
+
+test("when both storages throw, save is not verified", () => {
+  const store = createStore({
+    localStorage: throwingStorage(),
+    sessionStorage: throwingStorage(),
+  });
+  assert.equal(store.set("workout.saved.v1", savedPayload), false);
+  assert.equal(store.get("workout.saved.v1"), null);
+  assert.equal(store.kind(), "none");
+  assert.equal(savedRecordContains(store.get("workout.saved.v1"), "id-1"), false);
+  assert.equal(savedRecordContains("not json", "id-1"), false);
+  assert.equal(savedRecordContains("{}", "id-1"), false);
 });

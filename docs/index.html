@@ -28,6 +28,7 @@
     </header>
 
     <p class="banner file-warning">Opened as a file. The form still runs. Copy works more reliably on a local server or GitHub Pages, and you can always select the preview by hand.</p>
+    <p class="banner storage-blocked" id="storage-note" role="alert" hidden>This browser is blocking storage. In Brave, allow cookies or Shields for this site. You can still copy the workout.</p>
     <noscript><p class="banner">This page needs JavaScript. Nothing you type is uploaded.</p></noscript>
 
     <main class="stack">
@@ -81,7 +82,6 @@
           <button type="button" class="secondary" id="save">Save workout</button>
           <button type="button" class="text-btn" id="clear">Clear workout</button>
         </div>
-        <p class="banner" id="storage-note" hidden>This browser is not storing data. You can still copy the workout.</p>
       </form>
     </main>
 
@@ -95,7 +95,7 @@
       <p class="status" id="status" role="status"></p>
     </section>
 
-    <p class="foot">Saved on this phone only. A refresh keeps the workout you are filling in. The preview stays in the page, under the sets.</p>
+    <p class="foot">Saved on this phone only, when the browser allows storage. A refresh keeps the workout you are filling in. The preview stays in the page, under the sets.</p>
   </div>
 
   <script src="./program.js"></script>

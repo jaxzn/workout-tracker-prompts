@@ -7,11 +7,10 @@
   var state = {
     draft: null,
     saved: [],
-    persistOk: true,
     category: "All",
   };
 
-  var memoryStore = new Map();
+  var store = program.openBrowserStore();
   var flashToken = 0;
   var els = {};
 
@@ -20,23 +19,7 @@
   }
 
   function storageGet(key) {
-    if (!state.persistOk) return memoryStore.has(key) ? memoryStore.get(key) : null;
-    try {
-      return localStorage.getItem(key);
-    } catch (error) {
-      state.persistOk = false;
-      return memoryStore.has(key) ? memoryStore.get(key) : null;
-    }
-  }
-
-  function storageSet(key, value) {
-    memoryStore.set(key, value);
-    if (!state.persistOk) return;
-    try {
-      localStorage.setItem(key, value);
-    } catch (error) {
-      state.persistOk = false;
-    }
+    return store.get(key);
   }
 
   function parseJSON(value) {
@@ -57,17 +40,24 @@
   }
 
   function showStorageNote() {
-    els.storageNote.hidden = state.persistOk;
+    els.storageNote.hidden = store.kind() !== "none";
   }
 
   function persistDraft() {
-    storageSet(STORAGE.draft, JSON.stringify(state.draft));
+    syncFromDom();
+    var ok = store.set(STORAGE.draft, JSON.stringify(state.draft));
     showStorageNote();
+    return ok;
   }
 
   function persistSaved() {
-    storageSet(STORAGE.saved, JSON.stringify(state.saved));
+    var ok = store.set(STORAGE.saved, JSON.stringify(state.saved));
     showStorageNote();
+    return ok;
+  }
+
+  function storageBlockedMessage() {
+    return "Couldn't save. This browser is blocking storage. In Brave, allow cookies or Shields for this site.";
   }
 
   function updateSaveLabel() {
@@ -75,7 +65,7 @@
   }
 
   function domMatchesState() {
-    if (!els.exercises) return false;
+    if (!state.draft || !els.exercises) return false;
     return els.exercises.querySelectorAll(".exercise").length === state.draft.exercises.length;
   }
 
@@ -366,6 +356,56 @@
     }, 2800);
   }
 
+  function motionBehavior() {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "auto";
+    return "smooth";
+  }
+
+  // Keep the active weight/reps field in the visible area above the keyboard.
+  // interactive-widget=resizes-content shrinks the layout when it can; visualViewport
+  // covers the browsers that leave the layout tall and cover the bottom instead.
+  function scrollFieldIntoView(input) {
+    if (!input || typeof input.scrollIntoView !== "function") return;
+    var viewport = window.visualViewport;
+    var layoutHeight = window.innerHeight || 0;
+    var visibleTop = viewport ? viewport.offsetTop : 0;
+    var visibleHeight = viewport ? viewport.height : layoutHeight;
+    var obscured = Math.max(0, layoutHeight - (visibleTop + visibleHeight));
+    var knownKeyboard = obscured > 40;
+    // Before the keyboard reports its height, reserve the lower half so the
+    // field is not left on the bottom edge that the keyboard is about to cover.
+    var reserve = knownKeyboard ? obscured + 32 : Math.round(visibleHeight * 0.46);
+    input.style.scrollMarginTop = "12px";
+    input.style.scrollMarginBottom = reserve + "px";
+    input.scrollIntoView({
+      behavior: motionBehavior(),
+      block: knownKeyboard ? "nearest" : "center",
+      inline: "nearest",
+    });
+  }
+
+  function focusWeightField(input) {
+    if (!input) return;
+    try {
+      input.focus({ preventScroll: true });
+    } catch (error) {
+      input.focus();
+    }
+    scrollFieldIntoView(input);
+  }
+
+  var viewportScrollTimer = 0;
+
+  function keepActiveFieldVisible() {
+    window.clearTimeout(viewportScrollTimer);
+    viewportScrollTimer = window.setTimeout(function () {
+      var active = document.activeElement;
+      if (!active || !els.exercises || !els.exercises.contains(active)) return;
+      if (active.tagName !== "INPUT") return;
+      scrollFieldIntoView(active);
+    }, 40);
+  }
+
   function addExerciseNamed(name) {
     var exercise = program.createExercise(name);
     state.draft.exercises.push(exercise);
@@ -376,9 +416,7 @@
     window.setTimeout(function () {
       var card = findCard(exercise.id);
       if (!card) return;
-      var input = card.querySelector(".set-weight");
-      if (input) input.focus({ preventScroll: true });
-      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      focusWeightField(card.querySelector(".set-weight"));
     }, 60);
   }
 
@@ -407,8 +445,7 @@
     var rows = card.querySelectorAll(".set-row");
     var last = rows[rows.length - 1];
     if (!last) return;
-    var input = last.querySelector(".set-weight");
-    if (input) input.focus();
+    focusWeightField(last.querySelector(".set-weight"));
   }
 
   function removeSet(exerciseId, setId, button) {
@@ -487,15 +524,22 @@
     state.saved = state.saved.filter(function (entry) { return entry.id !== id; });
     if (state.draft.savedId === id) {
       state.draft.savedId = null;
-      persistDraft();
       updateSaveLabel();
     }
-    persistSaved();
+    var savedOk = persistSaved();
+    var draftOk = persistDraft();
     renderSaved();
+    if (!savedOk || !draftOk || program.savedRecordContains(storageGet(STORAGE.saved), id)) {
+      flash(storageBlockedMessage());
+      showStorageNote();
+      return;
+    }
     flash("Removed the saved workout.");
   }
 
   function saveWorkout() {
+    syncFromDom();
+    renderPreview();
     if (!state.draft.exercises.length) {
       flash("Add an exercise before saving.");
       return;
@@ -508,27 +552,37 @@
         if (state.saved[i].id === state.draft.savedId) existing = state.saved[i];
       }
     }
+    var updating = Boolean(existing);
+    var id;
     if (existing) {
       existing.draft = snapshot;
       existing.savedAt = new Date().toISOString();
-      persistSaved();
-      renderSaved();
-      flash("Updated the saved workout.");
-      return;
+      id = existing.id;
+    } else {
+      id = program.uid();
+      state.saved.unshift({
+        id: id,
+        savedAt: new Date().toISOString(),
+        draft: snapshot,
+      });
+      state.saved = state.saved.slice(0, 40);
+      state.draft.savedId = id;
     }
-    var id = program.uid();
-    state.saved.unshift({
-      id: id,
-      savedAt: new Date().toISOString(),
-      draft: snapshot,
-    });
-    state.saved = state.saved.slice(0, 40);
-    state.draft.savedId = id;
-    persistSaved();
-    persistDraft();
+    var savedOk = persistSaved();
+    var draftOk = persistDraft();
+    var verified = savedOk && draftOk && program.savedRecordContains(storageGet(STORAGE.saved), id);
     updateSaveLabel();
     renderSaved();
-    flash("Saved on this phone.");
+    if (!verified) {
+      flash(storageBlockedMessage());
+      showStorageNote();
+      return;
+    }
+    if (store.kind() === "session") {
+      flash("Saved for this tab. A refresh keeps it. In Brave, allow cookies or Shields for this site so it stays after you close the tab.");
+      return;
+    }
+    flash(updating ? "Updated the saved workout." : "Saved on this phone.");
   }
 
   function clearWorkout() {
@@ -764,6 +818,15 @@
     });
     els.exercises.addEventListener("input", onExerciseInput);
     els.exercises.addEventListener("click", onExerciseClick);
+    els.exercises.addEventListener("focusin", function (event) {
+      var target = event.target;
+      if (!target || target.tagName !== "INPUT") return;
+      scrollFieldIntoView(target);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", keepActiveFieldVisible);
+      window.visualViewport.addEventListener("scroll", keepActiveFieldVisible);
+    }
     els.savedList.addEventListener("click", onSavedClick);
     els.save.addEventListener("click", saveWorkout);
     els.clear.addEventListener("click", clearWorkout);

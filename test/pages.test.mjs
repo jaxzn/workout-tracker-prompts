@@ -32,6 +32,9 @@ test("the workout page is static, phone-first, and not the old split form", () =
   assert.match(index, /id="exercise-pick"/);
   assert.match(index, /Choose exercise/);
   assert.match(index, /id="custom-name"/);
+  assert.match(index, /id="storage-note"/);
+  assert.match(index, /allow cookies or Shields/);
+  assert.match(read("docs/smolov.html"), /id="storage-note"/);
   assert.equal(index.includes("category-chips"), false);
   assert.equal(index.includes("exercise-search"), false);
   assert.equal(existsSync(join(root, "docs/.nojekyll")), true);
@@ -45,11 +48,40 @@ test("the calculator links back and can add a day to the workout", () => {
   assert.match(page, /src="\.\/smolov\.js"/);
   assert.match(page, /id="tm"/);
   assert.match(page, /id="bump"/);
-  assert.match(page, /id="week"/);
+  assert.match(page, /Three weeks/);
+  assert.equal(page.includes('id="week"'), false);
   assert.match(script, /Add to current workout/);
   assert.match(script, /Replace current workout/);
   assert.match(script, /sessionStorage/);
   assert.match(script, /pendingToQuery/);
-  assert.match(script, /openComposer\(day, "append"\)/);
-  assert.match(script, /openComposer\(day, "replace"\)/);
+  assert.match(script, /openComposer\(slot\.week, slot\.day, "append"\)/);
+  assert.match(script, /openComposer\(slot\.week, slot\.day, "replace"\)/);
+  assert.match(script, /openBrowserStore/);
+  assert.match(script, /smolovCycle/);
+});
+
+test("adding an exercise scrolls the weight field above the keyboard", () => {
+  const app = read("docs/app.js");
+  const index = read("docs/index.html");
+  assert.match(index, /interactive-widget=resizes-content/);
+  assert.match(app, /visualViewport/);
+  assert.match(app, /scrollIntoView/);
+  assert.match(app, /focusWeightField/);
+  assert.equal(read("docs/styles.css").includes("position: fixed"), false);
+  assert.equal(read("docs/styles.css").includes("position: sticky"), false);
+});
+
+test("save syncs the form and only claims success after the saved list reads back", () => {
+  const app = read("docs/app.js");
+  const persistStart = app.indexOf("function persistDraft");
+  const persist = app.slice(persistStart, app.indexOf("function persistSaved"));
+  assert.match(persist, /syncFromDom\(\)/);
+  const saveStart = app.indexOf("function saveWorkout");
+  const save = app.slice(saveStart, app.indexOf("function clearWorkout"));
+  assert.match(save, /syncFromDom\(\)/);
+  const verifiedAt = save.indexOf("savedRecordContains");
+  const successAt = save.indexOf("Saved on this phone.");
+  assert.ok(verifiedAt !== -1 && successAt !== -1 && verifiedAt < successAt);
+  assert.match(save, /storageBlockedMessage\(\)/);
+  assert.match(app, /Couldn't save/);
 });
