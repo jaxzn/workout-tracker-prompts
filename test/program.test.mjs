@@ -11,8 +11,11 @@ const sandbox = { URLSearchParams };
 vm.runInNewContext(readFileSync(programPath, "utf8"), sandbox, { filename: "program.js" });
 
 const {
+  CATEGORIES,
   EXERCISES,
+  EXERCISE_CATALOG,
   applyPending,
+  exercisesInGroup,
   cloneExercises,
   coercePending,
   formatChat,
@@ -40,6 +43,24 @@ test("the exercise list matches the composer", () => {
     "OHP",
     "Fly",
   ]);
+});
+
+test("exercise groups overlap where a lift fits more than one", () => {
+  assert.deepEqual([...CATEGORIES], [
+    "Upper",
+    "Lower",
+    "Free weights",
+    "Banded",
+    "BW",
+    "Barbell",
+    "Machine",
+  ]);
+  const incline = [...EXERCISE_CATALOG].find((item) => item.name === "Incline bench");
+  assert.deepEqual([...incline.groups], ["Upper", "Barbell", "Free weights"]);
+  assert.deepEqual([...exercisesInGroup("Banded")], ["TKE", "Spanish squat"]);
+  assert.deepEqual([...exercisesInGroup("BW")], ["Dips", "Step-downs"]);
+  assert.equal(exercisesInGroup("Machine").includes("Lat pulldown"), true);
+  assert.equal(EXERCISE_CATALOG.length, EXERCISES.length);
 });
 
 test("chat prompt matches the workout note", () => {

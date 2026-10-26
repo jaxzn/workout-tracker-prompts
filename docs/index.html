@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="Log a workout on your phone and copy it into chat or Google Sheets.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0c0e12">
@@ -49,20 +49,20 @@
 
         <section aria-labelledby="add-label">
           <h2 id="add-label">Add exercise</h2>
-          <div class="add-row">
-            <div>
-              <label for="exercise-pick" class="sr-only">Exercise</label>
-              <select id="exercise-pick">
-                <option value="">Choose an exercise</option>
-              </select>
-            </div>
-            <button type="button" class="secondary" id="add-exercise">Add</button>
+          <div class="field tight">
+            <label for="exercise-search">Search</label>
+            <input id="exercise-search" type="search" enterkeyhint="search" placeholder="Name" autocomplete="off">
           </div>
-          <div class="field" id="custom-field" hidden>
+          <div class="chips" id="category-chips" role="group" aria-label="Exercise groups"></div>
+          <div id="exercise-catalog"></div>
+          <div class="field">
             <label for="custom-name">Custom name</label>
-            <input id="custom-name" type="text" maxlength="80" placeholder="Exercise name" enterkeyhint="done">
+            <div class="add-row">
+              <input id="custom-name" type="text" maxlength="80" placeholder="Not in the list" enterkeyhint="done" autocomplete="off">
+              <button type="button" class="secondary" id="add-exercise">Add</button>
+            </div>
           </div>
-          <p class="hint">Incline, dips, laterals, knee-friendly legs, pull, and a custom name. <a href="./smolov.html">Smolov Jr</a> can drop a whole day in.</p>
+          <p class="hint">An exercise can sit in more than one group. <a href="./smolov.html">Smolov Jr</a> can drop a whole day in.</p>
         </section>
 
         <section aria-labelledby="session-label">
@@ -79,20 +79,18 @@
       </form>
     </main>
 
-    <p class="foot">Saved on this phone only. A refresh keeps the workout you are filling in.</p>
-  </div>
-
-  <footer class="dock">
-    <div class="dock-inner">
+    <section class="preview" aria-labelledby="preview-label">
       <h2 id="preview-label">Preview</h2>
       <pre id="message" tabindex="0" aria-labelledby="preview-label"></pre>
-      <div class="dock-actions">
+      <div class="preview-actions">
         <button type="button" class="primary" id="copy-chat">Copy for chat</button>
         <button type="button" class="secondary" id="copy-sheets">Copy for Sheets</button>
       </div>
       <p class="status" id="status" role="status"></p>
-    </div>
-  </footer>
+    </section>
+
+    <p class="foot">Saved on this phone only. A refresh keeps the workout you are filling in. The preview stays in the page, under the sets.</p>
+  </div>
 
   <script src="./program.js"></script>
   <script src="./app.js"></script>

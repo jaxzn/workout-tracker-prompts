@@ -4,19 +4,25 @@
   // Shared workout and Smolov Jr math for the static pages.
   // No DOM here. Both pages and the node tests use this file.
 
-  var EXERCISES = [
-    "Incline bench",
-    "Dips",
-    "Laterals",
-    "TKE",
-    "Spanish squat",
-    "Step-downs",
-    "Lat pulldown",
-    "Rows",
-    "Curls",
-    "OHP",
-    "Fly",
+  var CATEGORIES = ["Upper", "Lower", "Free weights", "Banded", "BW", "Barbell", "Machine"];
+
+  // An exercise can sit in more than one group. The name list stays in the
+  // original order so saved notes and the calculator datalist do not shuffle.
+  var EXERCISE_CATALOG = [
+    { name: "Incline bench", groups: ["Upper", "Barbell", "Free weights"] },
+    { name: "Dips", groups: ["Upper", "BW"] },
+    { name: "Laterals", groups: ["Upper", "Free weights"] },
+    { name: "TKE", groups: ["Lower", "Banded"] },
+    { name: "Spanish squat", groups: ["Lower", "Banded"] },
+    { name: "Step-downs", groups: ["Lower", "BW"] },
+    { name: "Lat pulldown", groups: ["Upper", "Machine"] },
+    { name: "Rows", groups: ["Upper", "Free weights", "Barbell", "Machine"] },
+    { name: "Curls", groups: ["Upper", "Free weights", "Barbell"] },
+    { name: "OHP", groups: ["Upper", "Barbell", "Free weights"] },
+    { name: "Fly", groups: ["Upper", "Free weights", "Machine"] },
   ];
+
+  var EXERCISES = EXERCISE_CATALOG.map(function (item) { return item.name; });
 
   var DAYS = [
     { id: "day1", label: "Day 1", sets: 6, reps: 6, pct: 0.7 },
@@ -371,6 +377,14 @@ function formatSheets(draft) {
     return exercise;
   }
 
+  function exercisesInGroup(group) {
+    var names = [];
+    EXERCISE_CATALOG.forEach(function (item) {
+      if (item.groups.indexOf(group) !== -1) names.push(item.name);
+    });
+    return names;
+  }
+
   function snapshotDraft(draft) {
     return {
       date: draft.date,
@@ -386,7 +400,10 @@ function formatSheets(draft) {
   }
 
   globalThis.WorkoutProgram = {
+    CATEGORIES: CATEGORIES,
+    EXERCISE_CATALOG: EXERCISE_CATALOG,
     EXERCISES: EXERCISES,
+    exercisesInGroup: exercisesInGroup,
     DAYS: DAYS,
     STORAGE: STORAGE,
     MAX_SETS: MAX_SETS,
