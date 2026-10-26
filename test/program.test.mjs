@@ -27,6 +27,7 @@ const {
   pendingFromQuery,
   pendingToQuery,
   createStore,
+  keyboardScrollDelta,
   roundToStep,
   savedRecordContains,
   smolovCycle,
@@ -379,4 +380,15 @@ test("when both storages throw, save is not verified", () => {
   assert.equal(savedRecordContains(store.get("workout.saved.v1"), "id-1"), false);
   assert.equal(savedRecordContains("not json", "id-1"), false);
   assert.equal(savedRecordContains("{}", "id-1"), false);
+});
+
+test("a covered weight field scrolls into the upper 40% above the keyboard", () => {
+  const viewport = { offsetTop: 0, height: 400 };
+  const delta = keyboardScrollDelta({ top: 520, bottom: 568 }, viewport);
+  const landed = 568 - delta;
+  assert.equal(delta, 568 - 160);
+  assert.ok(landed <= viewport.height * 0.4);
+  assert.ok(viewport.height - landed >= 140);
+  assert.equal(keyboardScrollDelta({ top: 40, bottom: 88 }, viewport), 0);
+  assert.equal(keyboardScrollDelta({ top: 300, bottom: 348 }, { offsetTop: 80, height: 360 }), 124);
 });

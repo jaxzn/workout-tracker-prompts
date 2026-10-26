@@ -563,6 +563,29 @@ function formatSheets(draft) {
     return false;
   }
 
+  // Positive means scroll the document down so the field moves up.
+  // rect is getBoundingClientRect (layout viewport). viewport is visualViewport.
+  // The field's bottom should land in the upper 40% of the visible area and
+  // at least 140px above the keyboard (the bottom of the visual viewport).
+  function keyboardScrollDelta(rect, viewport) {
+    var offsetTop = viewport && isFiniteNumber(viewport.offsetTop) ? viewport.offsetTop : 0;
+    var height = viewport && isFiniteNumber(viewport.height) ? viewport.height : 0;
+    if (!rect || !height) return 0;
+    var top = rect.top - offsetTop;
+    var bottom = rect.bottom - offsetTop;
+    var pad = 140;
+    var aboveKeyboard = height - pad;
+    var upper = height * 0.4;
+    var targetBottom = aboveKeyboard > 48 ? Math.min(upper, aboveKeyboard) : upper;
+    if (bottom > targetBottom + 1) return bottom - targetBottom;
+    if (top < 8) return top - 8;
+    return 0;
+  }
+
+  function isFiniteNumber(value) {
+    return typeof value === "number" && isFinite(value);
+  }
+
   function snapshotDraft(draft) {
     return {
       date: draft.date,
@@ -614,5 +637,6 @@ function formatSheets(draft) {
     createStore: createStore,
     openBrowserStore: openBrowserStore,
     savedRecordContains: savedRecordContains,
+    keyboardScrollDelta: keyboardScrollDelta,
   };
 })();
