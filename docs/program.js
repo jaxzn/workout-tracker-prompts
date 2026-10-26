@@ -291,6 +291,30 @@ function formatSheets(draft) {
     return n;
   }
 
+  var SMOLOV_WEEKS = 3;
+
+  function smolovCycle(settings) {
+    var input = settings && typeof settings === "object" ? settings : {};
+    var base = normalizeTm(input.tm);
+    var bump = normalizeBump(input.weeklyBump);
+    var lift = asText(input.lift).trim().slice(0, 80) || "Incline bench";
+    var weeks = [];
+    for (var week = 1; week <= SMOLOV_WEEKS; week += 1) {
+      weeks.push(smolovWeek({
+        tm: base,
+        weeklyBump: bump,
+        week: week,
+        lift: lift,
+      }));
+    }
+    return {
+      lift: lift,
+      baseTm: base,
+      bump: bump,
+      weeks: weeks,
+    };
+  }
+
   function smolovWeek(settings) {
     var input = settings && typeof settings === "object" ? settings : {};
     var base = normalizeTm(input.tm);
@@ -398,6 +422,147 @@ function formatSheets(draft) {
     });
   }
 
+  // localStorage first, then sessionStorage, same keys either way.
+  // Brave Shields / block-all-cookies throws, or a write that does not
+  // read back, drops to the next backend. kind() "none" means nothing
+  // was stored. Callers must not report a successful save in that case.
+  var STORAGE_PROBE = "workout.storage.probe";
+
+  function canUseStorage(storage) {
+    if (!storage || typeof storage.getItem !== "function" || typeof storage.setItem !== "function") {
+      return false;
+    }
+    var previous;
+    try {
+      previous = storage.getItem(STORAGE_PROBE);
+    } catch (error) {
+      return false;
+    }
+    try {
+      storage.setItem(STORAGE_PROBE, "1");
+      if (storage.getItem(STORAGE_PROBE) !== "1") return false;
+    } catch (error) {
+      return false;
+    }
+    try {
+      if (previous == null) {
+        if (typeof storage.removeItem === "function") storage.removeItem(STORAGE_PROBE);
+      } else {
+        storage.setItem(STORAGE_PROBE, previous);
+      }
+    } catch (error) {
+      /* a leftover probe key is harmless */
+    }
+    return true;
+  }
+
+  function createStore(backends) {
+    var local = backends && backends.localStorage;
+    var session = backends && backends.sessionStorage;
+    var prefer = "local";
+    var probed = false;
+
+    function detect() {
+      if (probed) return;
+      probed = true;
+      if (canUseStorage(local)) prefer = "local";
+      else if (canUseStorage(session)) prefer = "session";
+      else prefer = "none";
+    }
+
+    function current() {
+      detect();
+      if (prefer === "local") return local;
+      if (prefer === "session") return session;
+      return null;
+    }
+
+    function read(storage, key) {
+      try {
+        return { ok: true, value: storage.getItem(key) };
+      } catch (error) {
+        return { ok: false, value: null };
+      }
+    }
+
+    function demote() {
+      if (prefer === "local" && canUseStorage(session)) {
+        prefer = "session";
+        probed = true;
+        return true;
+      }
+      prefer = "none";
+      probed = true;
+      return false;
+    }
+
+    return {
+      get: function (key) {
+        var storage = current();
+        if (!storage) return null;
+        var result = read(storage, key);
+        if (result.ok) return result.value;
+        if (!demote()) return null;
+        storage = current();
+        if (!storage) return null;
+        result = read(storage, key);
+        return result.ok ? result.value : null;
+      },
+      set: function (key, value) {
+        var storage = current();
+        if (!storage) return false;
+        var text = String(value);
+        try {
+          storage.setItem(key, text);
+          if (storage.getItem(key) !== text) {
+            if (!demote()) return false;
+            return this.set(key, value);
+          }
+          return true;
+        } catch (error) {
+          if (!demote()) return false;
+          return this.set(key, value);
+        }
+      },
+      kind: function () {
+        detect();
+        return prefer;
+      },
+    };
+  }
+
+  function browserStore(kind) {
+    try {
+      var storage = globalThis[kind];
+      if (!storage || typeof storage.getItem !== "function") return null;
+      return storage;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function openBrowserStore() {
+    return createStore({
+      localStorage: browserStore("localStorage"),
+      sessionStorage: browserStore("sessionStorage"),
+    });
+  }
+
+  function savedRecordContains(raw, id) {
+    if (!id || raw == null || raw === "") return false;
+    var parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      return false;
+    }
+    if (!Array.isArray(parsed)) return false;
+    for (var i = 0; i < parsed.length; i += 1) {
+      if (parsed[i] && parsed[i].id === id) return true;
+    }
+    return false;
+  }
+
   function snapshotDraft(draft) {
     return {
       date: draft.date,
@@ -440,10 +605,14 @@ function formatSheets(draft) {
     normalizeSaved: normalizeSaved,
     savedLabel: savedLabel,
     smolovWeek: smolovWeek,
+    smolovCycle: smolovCycle,
     coercePending: coercePending,
     pendingToQuery: pendingToQuery,
     pendingFromQuery: pendingFromQuery,
     applyPending: applyPending,
     snapshotDraft: snapshotDraft,
+    createStore: createStore,
+    openBrowserStore: openBrowserStore,
+    savedRecordContains: savedRecordContains,
   };
 })();

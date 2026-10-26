@@ -18,16 +18,19 @@
     }
   }
 
+  var store = program.openBrowserStore();
+
   function storageGet(key) {
-    try {
-      return localStorage.getItem(key);
-    } catch (error) {
-      return null;
-    }
+    return store.get(key);
+  }
+
+  function showStorageNote() {
+    if (!els.storageNote) return;
+    els.storageNote.hidden = store.kind() !== "none";
   }
 
   function defaultSettings() {
-    return { tm: "200", weeklyBump: "5", week: "", lift: "Incline bench" };
+    return { tm: "200", weeklyBump: "5", lift: "Incline bench" };
   }
 
   function loadSettings() {
@@ -36,7 +39,6 @@
     return {
       tm: raw.tm == null || raw.tm === "" ? defaults.tm : String(raw.tm),
       weeklyBump: raw.weeklyBump == null || raw.weeklyBump === "" ? defaults.weeklyBump : String(raw.weeklyBump),
-      week: raw.week == null ? "" : String(raw.week),
       lift: raw.lift == null || String(raw.lift).trim() === "" ? defaults.lift : String(raw.lift),
     };
   }
@@ -45,21 +47,18 @@
     return {
       tm: els.tm.value,
       weeklyBump: els.bump.value,
-      week: els.week.value,
       lift: els.lift.value,
     };
   }
 
   function persistSettings() {
-    try {
-      localStorage.setItem(STORAGE.smolov, JSON.stringify(readSettings()));
-    } catch (error) {
-      /* the calculator still runs without storage */
-    }
+    var ok = store.set(STORAGE.smolov, JSON.stringify(readSettings()));
+    showStorageNote();
+    return ok;
   }
 
-  function currentWeek() {
-    return program.smolovWeek(readSettings());
+  function currentCycle() {
+    return program.smolovCycle(readSettings());
   }
 
   function currentDraft() {
@@ -80,30 +79,43 @@
       (shown ? " (" + shown + ")" : "") + ". Adding keeps them.";
   }
 
-  function summaryText(week) {
-    var text = week.lift + " · Week " + week.week + " · training max " + program.formatNumber(week.tm) + " lb";
-    if (week.week > 1) {
-      text += " · started at " + program.formatNumber(week.baseTm) + ", +" + program.formatNumber(week.bump) + " lb/week";
-    }
-    return text;
+  function summaryText(cycle) {
+    return cycle.lift + " · " + program.formatNumber(cycle.baseTm) + " lb · +" +
+      program.formatNumber(cycle.bump) + " lb each week";
   }
 
   function renderDays() {
-    var week = currentWeek();
+    var cycle = currentCycle();
     var draft = currentDraft();
     var hasWorkout = draft.exercises.length > 0;
-    els.summary.textContent = summaryText(week);
+    els.summary.textContent = summaryText(cycle);
     els.note.textContent = workoutNote(draft);
     els.days.replaceChildren();
-    week.days.forEach(function (day) {
-      els.days.append(renderDay(day, week, hasWorkout));
+    cycle.weeks.forEach(function (week) {
+      els.days.append(renderWeek(week, hasWorkout));
     });
+  }
+
+  function renderWeek(week, hasWorkout) {
+    var block = document.createElement("section");
+    block.className = "week-block";
+    var heading = document.createElement("h3");
+    heading.textContent = "Week " + week.week + " · " + program.formatNumber(week.tm) + " lb";
+    var list = document.createElement("div");
+    list.className = "week-days";
+    week.days.forEach(function (day) {
+      list.append(renderDay(day, week, hasWorkout));
+    });
+    block.append(heading, list);
+    return block;
   }
 
   function renderDay(day, week, hasWorkout) {
     var card = document.createElement("article");
-    card.className = "card day";
+    card.className = "card day-line";
 
+    var meta = document.createElement("div");
+    meta.className = "day-meta";
     var kickerRow = document.createElement("div");
     kickerRow.className = "kicker-row";
     var kicker = document.createElement("p");
@@ -116,29 +128,21 @@
       badge.textContent = "Optional";
       kickerRow.append(badge);
     }
+    var raw = program.formatNumber(day.raw);
+    var rounded = program.formatNumber(day.weight);
+    var caption = document.createElement("p");
+    caption.className = "plan-caption";
+    caption.textContent = day.sets + "\u00d7" + day.reps + " @ " + day.pctLabel +
+      (raw !== rounded ? " · " + raw + "\u2192" + rounded : "");
+    meta.append(kickerRow, caption);
 
     var figure = document.createElement("p");
     figure.className = "plan-figure";
-    figure.append(document.createTextNode(program.formatNumber(day.weight) + " "));
+    figure.append(document.createTextNode(rounded + " "));
     var unit = document.createElement("span");
     unit.className = "unit";
     unit.textContent = "lb";
     figure.append(unit);
-
-    var caption = document.createElement("p");
-    caption.className = "plan-caption";
-    caption.textContent = day.sets + "\u00d7" + day.reps + " @ " + day.pctLabel + " of " + program.formatNumber(week.tm) + " lb";
-
-    card.append(kickerRow, figure, caption);
-
-    var raw = program.formatNumber(day.raw);
-    var rounded = program.formatNumber(day.weight);
-    if (raw !== rounded) {
-      var note = document.createElement("p");
-      note.className = "hint";
-      note.textContent = raw + " rounds to " + rounded;
-      card.append(note);
-    }
 
     var actions = document.createElement("div");
     actions.className = "day-actions";
@@ -146,36 +150,43 @@
     add.type = "button";
     add.className = "primary";
     add.dataset.action = "add";
+    add.dataset.week = String(week.week);
     add.dataset.day = day.id;
-    add.textContent = "Add to current workout";
+    add.textContent = "Add";
     add.setAttribute(
       "aria-label",
-      "Add " + day.label + " to the current workout: " + week.lift + " " + rounded + " lb, " + day.sets + " by " + day.reps
+      "Add to current workout: week " + week.week + " " + day.label + ", " +
+        week.lift + " " + rounded + " lb, " + day.sets + " by " + day.reps
     );
     actions.append(add);
     if (hasWorkout) {
       var replace = document.createElement("button");
       replace.type = "button";
-      replace.className = "text-btn";
+      replace.className = "secondary";
       replace.dataset.action = "replace";
+      replace.dataset.week = String(week.week);
       replace.dataset.day = day.id;
-      replace.textContent = "Replace current workout";
+      replace.textContent = "Replace";
+      replace.setAttribute("aria-label", "Replace current workout");
       actions.append(replace);
     }
-    card.append(actions);
+    card.append(meta, figure, actions);
     return card;
   }
 
-  function dayById(id) {
-    var days = currentWeek().days;
-    for (var i = 0; i < days.length; i += 1) {
-      if (days[i].id === id) return days[i];
+  function findSlot(weekNumber, dayId) {
+    var weeks = currentCycle().weeks;
+    for (var i = 0; i < weeks.length; i += 1) {
+      if (String(weeks[i].week) !== String(weekNumber)) continue;
+      var days = weeks[i].days;
+      for (var d = 0; d < days.length; d += 1) {
+        if (days[d].id === dayId) return { week: weeks[i], day: days[d] };
+      }
     }
     return null;
   }
 
-  function openComposer(day, mode) {
-    var week = currentWeek();
+  function openComposer(week, day, mode) {
     var pending = {
       mode: mode,
       name: week.lift,
@@ -195,24 +206,24 @@
   function onDayClick(event) {
     var button = event.target.closest("[data-action]");
     if (!button || !els.days.contains(button)) return;
-    var day = dayById(button.dataset.day);
-    if (!day) return;
+    var slot = findSlot(button.dataset.week, button.dataset.day);
+    if (!slot) return;
     if (button.dataset.action === "add") {
-      openComposer(day, "append");
+      openComposer(slot.week, slot.day, "append");
       return;
     }
     if (button.dataset.action !== "replace") return;
     if (button.dataset.armed !== "true") {
       button.dataset.armed = "true";
-      button.textContent = "Confirm replace";
+      button.textContent = "Confirm";
       window.setTimeout(function () {
         if (!button.isConnected || button.dataset.armed !== "true") return;
         button.dataset.armed = "false";
-        button.textContent = "Replace current workout";
+        button.textContent = "Replace";
       }, 2800);
       return;
     }
-    openComposer(day, "replace");
+    openComposer(slot.week, slot.day, "replace");
   }
 
   function fillLifts() {
@@ -246,16 +257,16 @@
     els.lifts = $("lifts");
     els.tm = $("tm");
     els.bump = $("bump");
-    els.week = $("week");
     els.summary = $("week-summary");
     els.note = $("workout-note");
     els.days = $("days");
+    els.storageNote = $("storage-note");
+    showStorageNote();
     fillLifts();
     var settings = loadSettings();
     els.lift.value = settings.lift;
     els.tm.value = settings.tm;
     els.bump.value = settings.weeklyBump;
-    els.week.value = settings.week;
     bind();
     persistSettings();
     renderDays();

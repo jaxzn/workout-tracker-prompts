@@ -24,6 +24,7 @@
       <p class="lede">Training max in, bar weight out. Rounded to the nearest 5 lb.</p>
     </header>
 
+    <p class="banner storage-blocked" id="storage-note" role="alert" hidden>This browser is blocking storage. In Brave, allow cookies or Shields for this site. You can still use the calculator.</p>
     <noscript><p class="banner">This page needs JavaScript. Nothing you type is uploaded.</p></noscript>
 
     <main class="stack">
@@ -42,16 +43,12 @@
             <label for="bump">Weekly bump</label>
             <input id="bump" name="bump" type="number" inputmode="decimal" min="0" step="0.5">
           </div>
-          <div>
-            <label for="week">Week</label>
-            <input id="week" name="week" type="number" inputmode="numeric" min="1" max="52" step="1" placeholder="">
-          </div>
         </div>
-        <p class="hint">Bump defaults to +5 lb. Leave week blank for week 1. Each later week adds the bump to the training max.</p>
+        <p class="hint">Bump defaults to +5 lb. All three weeks are listed. Each later week adds the bump to the training max.</p>
       </form>
 
       <section aria-labelledby="week-title">
-        <h2 id="week-title">This week</h2>
+        <h2 id="week-title">Three weeks</h2>
         <p class="plan-caption" id="week-summary"></p>
         <p class="hint" id="workout-note"></p>
         <div id="days" class="stack cards"></div>
