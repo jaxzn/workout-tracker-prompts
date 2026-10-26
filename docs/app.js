@@ -1,25 +1,17 @@
 (function () {
   "use strict";
 
-  var program = globalThis.InclineProgram;
-  var SESSIONS = program.SESSIONS;
-  var FEELS = program.FEELS;
-
-  var STORAGE = {
-    settings: "incline-log.settings.v1",
-    draft: "incline-log.draft.v1",
-    entries: "incline-log.entries.v1",
-  };
+  var program = globalThis.WorkoutProgram;
+  var STORAGE = program.STORAGE;
+  var CUSTOM = "__custom__";
 
   var state = {
-    settings: null,
     draft: null,
-    entries: [],
+    saved: [],
     persistOk: true,
   };
 
   var memoryStore = new Map();
-  var chipSignature = "";
   var flashToken = 0;
   var els = {};
 
@@ -56,117 +48,16 @@
     }
   }
 
-  function uid() {
-    if (globalThis.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-    return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  function flash(text) {
+    var token = ++flashToken;
+    els.status.textContent = text;
+    window.setTimeout(function () {
+      if (flashToken === token) els.status.textContent = "";
+    }, 4200);
   }
 
-  function asText(value) {
-    return value == null ? "" : String(value);
-  }
-
-  function blankTo(value, fallback) {
-    return String(value).trim() === "" ? fallback : value;
-  }
-
-  function loadSettings() {
-    return program.normalizeSettings(parseJSON(storageGet(STORAGE.settings)) || program.DEFAULT_SETTINGS, new Date());
-  }
-
-  function coerceDraft(raw, settings) {
-    if (!raw || typeof raw !== "object" || !SESSIONS[raw.session]) {
-      return program.freshDraft(settings, new Date());
-    }
-    var date = program.parseISODate(raw.date);
-    var feel = FEELS.indexOf(raw.feel) === -1 ? "" : raw.feel;
-    return {
-      session: raw.session,
-      date: Number.isNaN(date.getTime()) ? program.formatISODate(new Date()) : raw.date,
-      weight: asText(raw.weight),
-      sets: asText(raw.sets),
-      reps: asText(raw.reps),
-      accessories: asText(raw.accessories).slice(0, 500),
-      distance: asText(raw.distance),
-      minutes: asText(raw.minutes),
-      seconds: asText(raw.seconds),
-      feel: feel,
-      notes: asText(raw.notes).slice(0, 1000),
-      done: raw.done === "no" ? "no" : "yes",
-      savedId: typeof raw.savedId === "string" ? raw.savedId : null,
-    };
-  }
-
-  function loadEntries() {
-    var raw = parseJSON(storageGet(STORAGE.entries));
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(function (entry) {
-      return entry && typeof entry.id === "string" && entry.draft && SESSIONS[entry.draft.session];
-    }).slice(0, 40);
-  }
-
-  function currentDate() {
-    var date = program.parseISODate(state.draft.date);
-    return Number.isNaN(date.getTime()) ? new Date() : date;
-  }
-
-  function currentPlan() {
-    if (state.draft.session === "run") return null;
-    var week = program.trainingWeek(currentDate(), state.settings).week;
-    return program.plannedLift(state.draft.session, state.settings, week);
-  }
-
-  function followingPlan() {
-    if (state.draft.session === "run") return true;
-    var plan = currentPlan();
-    if (!plan) return false;
-    if (String(state.draft.weight).trim() === "") return false;
-    return Number(state.draft.weight) === Number(plan.weight) &&
-      Number(state.draft.sets) === Number(plan.sets) &&
-      Number(state.draft.reps) === Number(plan.reps);
-  }
-
-  function writePlanNumbers() {
-    var plan = currentPlan();
-    if (!plan) return;
-    state.draft.weight = String(plan.weight);
-    state.draft.sets = String(plan.sets);
-    state.draft.reps = String(plan.reps);
-  }
-
-  function readDraftFromForm() {
-    state.draft.weight = els.weight.value;
-    state.draft.sets = els.sets.value;
-    state.draft.reps = els.reps.value;
-    state.draft.accessories = els.accessories.value;
-    state.draft.distance = els.distance.value;
-    state.draft.minutes = els.minutes.value;
-    state.draft.seconds = els.seconds.value;
-    state.draft.notes = els.notes.value;
-  }
-
-  function fillLiftFields() {
-    els.weight.value = state.draft.weight;
-    els.sets.value = state.draft.sets;
-    els.reps.value = state.draft.reps;
-  }
-
-  function fillForm() {
-    els.date.value = state.draft.date;
-    fillLiftFields();
-    els.accessories.value = state.draft.accessories;
-    els.distance.value = state.draft.distance;
-    els.minutes.value = state.draft.minutes;
-    els.seconds.value = state.draft.seconds;
-    els.notes.value = state.draft.notes;
-  }
-
-  function fillSettings() {
-    els.tm.value = state.settings.tm;
-    els.goal.value = state.settings.goal;
-    els.bump.value = state.settings.weeklyBump;
-    els.roundTo.value = String(state.settings.roundTo);
-    els.cycleStart.value = state.settings.cycleStart;
-    els.intensity.checked = state.settings.legsIntensity;
+  function showStorageNote() {
+    els.storageNote.hidden = state.persistOk;
   }
 
   function persistDraft() {
@@ -174,365 +65,527 @@
     showStorageNote();
   }
 
-  function persistSettings() {
-    storageSet(STORAGE.settings, JSON.stringify(state.settings));
+  function persistSaved() {
+    storageSet(STORAGE.saved, JSON.stringify(state.saved));
     showStorageNote();
   }
 
-  function persistEntries() {
-    storageSet(STORAGE.entries, JSON.stringify(state.entries));
-    showStorageNote();
+  function updateSaveLabel() {
+    els.save.textContent = state.draft.savedId ? "Update saved workout" : "Save workout";
   }
 
-  function showStorageNote() {
-    els.storageNote.hidden = state.persistOk;
+  function domMatchesState() {
+    if (!els.exercises) return false;
+    return els.exercises.querySelectorAll(".exercise").length === state.draft.exercises.length;
   }
 
-  function flash(text) {
-    var token = ++flashToken;
-    els.status.textContent = text;
-    window.setTimeout(function () {
-      if (flashToken === token) els.status.textContent = "";
-    }, 4000);
+  function syncFromDom() {
+    if (!domMatchesState()) return;
+    var cards = els.exercises.querySelectorAll(".exercise");
+    for (var i = 0; i < cards.length; i += 1) {
+      var card = cards[i];
+      var exercise = findExercise(card.dataset.id);
+      if (!exercise) continue;
+      var name = card.querySelector(".ex-name");
+      if (name) exercise.name = name.value;
+      var rows = card.querySelectorAll(".set-row");
+      for (var r = 0; r < rows.length; r += 1) {
+        var row = rows[r];
+        var set = findSet(exercise, row.dataset.id);
+        if (!set) continue;
+        var weight = row.querySelector(".set-weight");
+        var reps = row.querySelector(".set-reps");
+        if (weight) set.weight = weight.value;
+        if (reps) set.reps = reps.value;
+      }
+    }
   }
 
-  function setPressed(nodes, attr, value) {
-    nodes.forEach(function (node) {
-      node.setAttribute("aria-pressed", node.getAttribute(attr) === value ? "true" : "false");
+  function renderPreview() {
+    syncFromDom();
+    els.message.textContent = program.formatChat(state.draft);
+    sizeDock();
+  }
+
+  function sizeDock() {
+    if (!els.dock) return;
+    var height = els.dock.offsetHeight;
+    if (height) document.documentElement.style.setProperty("--dock-h", height + "px");
+  }
+
+  function pinDock() {
+    if (!window.visualViewport || !els.dock) return;
+    var vv = window.visualViewport;
+    var overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    els.dock.style.bottom = overlap ? overlap + "px" : "0px";
+  }
+
+  function findExercise(id) {
+    for (var i = 0; i < state.draft.exercises.length; i += 1) {
+      if (state.draft.exercises[i].id === id) return state.draft.exercises[i];
+    }
+    return null;
+  }
+
+  function findSet(exercise, id) {
+    for (var i = 0; i < exercise.sets.length; i += 1) {
+      if (exercise.sets[i].id === id) return exercise.sets[i];
+    }
+    return null;
+  }
+
+  function findCard(id) {
+    var cards = els.exercises.querySelectorAll(".exercise");
+    for (var i = 0; i < cards.length; i += 1) {
+      if (cards[i].dataset.id === id) return cards[i];
+    }
+    return null;
+  }
+
+  function isBodyweight(value) {
+    return /^(bw|bodyweight|body\s+weight)$/i.test(String(value || "").trim());
+  }
+
+  function setHasData(set) {
+    return String(set.weight || "").trim() !== "" || String(set.reps || "").trim() !== "";
+  }
+
+  function exerciseHasData(exercise) {
+    if (String(exercise.name || "").trim()) return true;
+    for (var i = 0; i < exercise.sets.length; i += 1) {
+      if (setHasData(exercise.sets[i])) return true;
+    }
+    return false;
+  }
+
+  function fillExerciseSelect() {
+    program.EXERCISES.forEach(function (name) {
+      var option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      els.pick.append(option);
+    });
+    var custom = document.createElement("option");
+    custom.value = CUSTOM;
+    custom.textContent = "Custom name";
+    els.pick.append(custom);
+  }
+
+  function renderExercises() {
+    els.exercises.replaceChildren();
+    els.exerciseEmpty.hidden = state.draft.exercises.length > 0;
+    state.draft.exercises.forEach(function (exercise) {
+      els.exercises.append(renderExercise(exercise));
     });
   }
 
-  function updateLede(week) {
-    var tm = program.formatNumber(week.tm);
-    var goal = program.formatNumber(state.settings.goal);
-    if (Number(tm) > Number(goal)) {
-      els.lede.textContent = week.label + " · TM " + tm + " lb · past the " + goal + " lb goal";
-    } else if (Number(tm) === Number(goal)) {
-      els.lede.textContent = week.label + " · TM " + tm + " lb · at the incline goal";
-    } else {
-      els.lede.textContent = week.label + " · TM " + tm + " lb → " + goal;
-    }
-  }
+  function renderExercise(exercise) {
+    var card = document.createElement("article");
+    card.className = "card exercise";
+    card.dataset.id = exercise.id;
 
-  function renderChips(weekItems) {
-    var signature = weekItems.map(function (item) {
-      var weight = item.plan ? item.plan.weight + "x" + item.plan.sets + "x" + item.plan.reps : "run";
-      return item.id + ":" + program.formatISODate(item.date) + ":" + weight;
-    }).join("|") + ">" + state.draft.date + ":" + state.draft.session;
-    if (signature === chipSignature) return;
-    chipSignature = signature;
-    var fragment = document.createDocumentFragment();
-    weekItems.forEach(function (item) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "choice";
-      var selected = program.formatISODate(item.date) === state.draft.date && item.id === state.draft.session;
-      button.setAttribute("aria-pressed", selected ? "true" : "false");
-      var title = document.createElement("span");
-      title.className = "choice-title";
-      title.textContent = program.formatWeekdayDay(item.date);
-      var meta = document.createElement("span");
-      meta.className = "choice-meta";
-      meta.textContent = item.id === "run"
-        ? "Easy run · 3–5 mi"
-        : item.plan.weight + " lb · " + item.plan.sets + "×" + item.plan.reps;
-      button.append(title, meta);
-      button.addEventListener("click", function () {
-        applyPlanSelection({ date: item.date, session: item.id });
-      });
-      fragment.append(button);
+    var head = document.createElement("div");
+    head.className = "ex-head";
+    var nameWrap = document.createElement("div");
+    var nameId = "ex-" + exercise.id;
+    var nameLabel = document.createElement("label");
+    nameLabel.htmlFor = nameId;
+    nameLabel.textContent = "Exercise";
+    var nameInput = document.createElement("input");
+    nameInput.id = nameId;
+    nameInput.className = "ex-name";
+    nameInput.type = "text";
+    nameInput.maxLength = 80;
+    nameInput.value = exercise.name;
+    nameInput.autocomplete = "off";
+    nameInput.spellcheck = false;
+    nameWrap.append(nameLabel, nameInput);
+
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "remove";
+    remove.dataset.action = "remove-exercise";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", "Remove " + (exercise.name || "exercise"));
+    head.append(nameWrap, remove);
+
+    var columns = document.createElement("div");
+    columns.className = "set-columns";
+    columns.setAttribute("aria-hidden", "true");
+    ["", "Weight", "", "Reps", ""].forEach(function (text) {
+      var span = document.createElement("span");
+      span.textContent = text;
+      columns.append(span);
     });
-    els.weekPlan.replaceChildren(fragment);
-  }
 
-  function updateOffday() {
-    var date = program.parseISODate(state.draft.date);
-    var base = Number.isNaN(date.getTime()) ? new Date() : date;
-    if (program.sessionIdForDate(base)) {
-      els.offday.hidden = true;
-      return;
-    }
-    var next = program.nextPlanOnOrAfter(base);
-    els.offday.hidden = !next;
-    if (!next) return;
-    els.jumpNext.textContent = "Go to " + program.formatWeekdayDay(next.date) + " · " + SESSIONS[next.session].short;
-  }
-
-  function updateDerived() {
-    var date = currentDate();
-    var week = program.trainingWeek(date, state.settings);
-    var isRun = state.draft.session === "run";
-    updateLede(week);
-    els.weekTitle.textContent = week.label;
-    els.weekRange.textContent = week.range + " · TM " + program.formatNumber(week.tm) + " lb";
-    renderChips(program.weekPlan(state.settings, date));
-    setPressed(els.sessionButtons, "data-session", state.draft.session);
-    setPressed(els.feelButtons, "data-feel", state.draft.feel);
-    setPressed(els.doneButtons, "data-done", state.draft.done);
-    els.legsMeta.textContent = state.settings.legsIntensity ? "Thu · 10×3 @ 85%" : "Thu · 8×4 @ 80%";
-    els.liftFields.hidden = isRun;
-    els.runFields.hidden = !isRun;
-    els.workLabel.textContent = isRun ? "Easy run" : "Incline";
-    els.matchPlan.hidden = isRun || followingPlan();
-    if (!isRun) {
-      var plan = currentPlan();
-      els.planWeight.textContent = program.formatNumber(plan.weight);
-      els.planCaption.textContent = program.planCaption(plan);
-      els.accessoryHint.textContent = SESSIONS[state.draft.session].accessoryHint;
-    }
-    updateOffday();
-    els.message.textContent = program.formatMessage(state.draft, state.settings);
-    els.save.textContent = state.draft.savedId ? "Update saved session" : "Save session";
-    showStorageNote();
-  }
-
-  function applyPlanSelection(item) {
-    state.draft.date = program.formatISODate(item.date);
-    state.draft.session = item.session;
-    state.draft.savedId = null;
-    if (item.session === "run") {
-      if (String(state.draft.distance).trim() === "") state.draft.distance = "4";
-    } else {
-      writePlanNumbers();
-    }
-    fillForm();
-    updateDerived();
-    persistDraft();
-  }
-
-  function selectSession(id) {
-    if (!SESSIONS[id] || state.draft.session === id) return;
-    state.draft.session = id;
-    state.draft.savedId = null;
-    if (id === "run") {
-      if (String(state.draft.distance).trim() === "") state.draft.distance = "4";
-    } else {
-      writePlanNumbers();
-    }
-    fillForm();
-    updateDerived();
-    persistDraft();
-  }
-
-  function shiftWeek(delta) {
-    var wasFollowing = followingPlan();
-    state.draft.date = program.formatISODate(program.addDays(currentDate(), 7 * delta));
-    state.draft.savedId = null;
-    if (wasFollowing && state.draft.session !== "run") writePlanNumbers();
-    fillForm();
-    updateDerived();
-    persistDraft();
-  }
-
-  function onDateChange() {
-    var next = els.date.value;
-    var parsed = program.parseISODate(next);
-    if (!next || Number.isNaN(parsed.getTime())) {
-      els.date.value = state.draft.date;
-      return;
-    }
-    if (next === state.draft.date) return;
-    var wasFollowing = followingPlan();
-    state.draft.date = next;
-    state.draft.savedId = null;
-    if (wasFollowing && state.draft.session !== "run") writePlanNumbers();
-    fillForm();
-    updateDerived();
-    persistDraft();
-  }
-
-  function selectFeel(feel) {
-    state.draft.feel = state.draft.feel === feel ? "" : feel;
-    updateDerived();
-    persistDraft();
-  }
-
-  function selectDone(done) {
-    state.draft.done = done === "no" ? "no" : "yes";
-    updateDerived();
-    persistDraft();
-  }
-
-  function commitSettings() {
-    var wasFollowing = followingPlan();
-    var pickedCycle = els.cycleStart.value;
-    state.settings = program.normalizeSettings({
-      tm: blankTo(els.tm.value, state.settings.tm),
-      goal: blankTo(els.goal.value, state.settings.goal),
-      weeklyBump: blankTo(els.bump.value, state.settings.weeklyBump),
-      roundTo: els.roundTo.value,
-      cycleStart: els.cycleStart.value || state.settings.cycleStart,
-      legsIntensity: els.intensity.checked,
-    }, new Date());
-    fillSettings();
-    if (pickedCycle && state.settings.cycleStart !== pickedCycle) {
-      flash("Weeks start on Monday, so week 1 starts " + program.formatLong(program.parseISODate(state.settings.cycleStart)) + ".");
-    }
-    if (wasFollowing && state.draft.session !== "run") {
-      writePlanNumbers();
-      fillLiftFields();
-    }
-    chipSignature = "";
-    updateDerived();
-    persistSettings();
-    persistDraft();
-  }
-
-  function draftSnapshot() {
-    return {
-      session: state.draft.session,
-      date: state.draft.date,
-      weight: state.draft.weight,
-      sets: state.draft.sets,
-      reps: state.draft.reps,
-      accessories: state.draft.accessories,
-      distance: state.draft.distance,
-      minutes: state.draft.minutes,
-      seconds: state.draft.seconds,
-      feel: state.draft.feel,
-      notes: state.draft.notes,
-      done: state.draft.done,
-    };
-  }
-
-  function saveEntry() {
-    readDraftFromForm();
-    var draft = draftSnapshot();
-    var existingIndex = state.entries.findIndex(function (entry) {
-      return entry.id === state.draft.savedId;
+    var sets = document.createElement("div");
+    sets.className = "sets";
+    exercise.sets.forEach(function (set, index) {
+      sets.append(renderSet(set, index));
     });
-    if (existingIndex >= 0) {
-      var existing = state.entries[existingIndex];
-      existing.draft = draft;
-      existing.savedAt = new Date().toISOString();
-      state.entries.splice(existingIndex, 1);
-      state.entries.unshift(existing);
-      flash("Updated the saved session.");
-    } else {
-      var id = uid();
-      state.draft.savedId = id;
-      state.entries.unshift({ id: id, savedAt: new Date().toISOString(), draft: draft });
-      flash("Saved on this phone.");
-    }
-    state.entries = state.entries.slice(0, 40);
-    persistEntries();
-    persistDraft();
-    updateDerived();
-    renderLog();
+
+    var add = document.createElement("button");
+    add.type = "button";
+    add.className = "secondary add-set";
+    add.dataset.action = "add-set";
+    add.textContent = "+ Set";
+
+    card.append(head, columns, sets, add);
+    return card;
   }
 
-  function loadEntry(id) {
-    var entry = state.entries.find(function (item) { return item.id === id; });
-    if (!entry) return;
-    state.draft = coerceDraft(entry.draft, state.settings);
-    state.draft.savedId = id;
-    fillForm();
-    chipSignature = "";
-    updateDerived();
-    persistDraft();
-    flash("Loaded into the form.");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  function renderSet(set, index) {
+    var row = document.createElement("div");
+    row.className = "set-row";
+    row.dataset.id = set.id;
+
+    var number = document.createElement("span");
+    number.className = "set-index";
+    number.textContent = String(index + 1);
+
+    var weight = document.createElement("input");
+    weight.className = "set-weight";
+    weight.type = "text";
+    weight.inputMode = "decimal";
+    weight.maxLength = 16;
+    weight.value = set.weight;
+    weight.placeholder = "lb";
+    weight.autocomplete = "off";
+    weight.spellcheck = false;
+    weight.setAttribute("aria-label", "Set " + (index + 1) + " weight");
+
+    var bw = document.createElement("button");
+    bw.type = "button";
+    bw.className = "bw-btn";
+    bw.dataset.action = "bw";
+    bw.textContent = "BW";
+    bw.setAttribute("aria-label", "Set " + (index + 1) + " bodyweight");
+    bw.setAttribute("aria-pressed", isBodyweight(set.weight) ? "true" : "false");
+
+    var reps = document.createElement("input");
+    reps.className = "set-reps";
+    reps.type = "text";
+    reps.inputMode = "numeric";
+    reps.maxLength = 8;
+    reps.value = set.reps;
+    reps.placeholder = "reps";
+    reps.autocomplete = "off";
+    reps.setAttribute("aria-label", "Set " + (index + 1) + " reps");
+
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "icon-btn";
+    remove.dataset.action = "remove-set";
+    remove.textContent = "\u00d7";
+    remove.setAttribute("aria-label", "Remove set " + (index + 1));
+
+    row.append(number, weight, bw, reps, remove);
+    return row;
   }
 
-  function deleteEntry(id) {
-    state.entries = state.entries.filter(function (entry) { return entry.id !== id; });
-    if (state.draft.savedId === id) state.draft.savedId = null;
-    persistEntries();
-    persistDraft();
-    updateDerived();
-    renderLog();
-    flash("Removed from this phone.");
-  }
-
-  function clearLog() {
-    if (els.clearLog.dataset.armed !== "true") {
-      els.clearLog.dataset.armed = "true";
-      els.clearLog.textContent = "Confirm clear";
-      window.setTimeout(function () {
-        if (els.clearLog.dataset.armed === "true") {
-          els.clearLog.dataset.armed = "false";
-          els.clearLog.textContent = "Clear all";
-        }
-      }, 2500);
-      return;
-    }
-    els.clearLog.dataset.armed = "false";
-    els.clearLog.textContent = "Clear all";
-    state.entries = [];
-    state.draft.savedId = null;
-    persistEntries();
-    persistDraft();
-    updateDerived();
-    renderLog();
-    flash("Cleared the log on this phone.");
-  }
-
-  function renderLog() {
-    els.logList.replaceChildren();
-    els.logEmpty.hidden = state.entries.length > 0;
-    els.clearLog.hidden = state.entries.length === 0;
-    state.entries.forEach(function (entry) {
+  function renderSaved() {
+    els.savedList.replaceChildren();
+    els.savedEmpty.hidden = state.saved.length > 0;
+    state.saved.forEach(function (entry) {
       var item = document.createElement("li");
       item.className = "log-item";
-      var open = document.createElement("button");
-      open.type = "button";
-      open.className = "log-open";
-      var summary = program.entrySummary(entry.draft);
+      var summary = program.savedLabel(entry);
+      var use = document.createElement("button");
+      use.type = "button";
+      use.className = "use-btn";
+      use.dataset.action = "use-saved";
+      use.dataset.id = entry.id;
       var title = document.createElement("span");
       title.className = "log-title";
       title.textContent = summary.title;
       var detail = document.createElement("span");
       detail.className = "log-detail";
       detail.textContent = summary.detail;
-      open.append(title, detail);
-      open.addEventListener("click", function () { loadEntry(entry.id); });
+      use.append(title, detail);
       var remove = document.createElement("button");
       remove.type = "button";
       remove.className = "remove";
+      remove.dataset.action = "remove-saved";
+      remove.dataset.id = entry.id;
       remove.textContent = "Remove";
-      remove.setAttribute("aria-label", "Remove " + summary.title);
-      remove.addEventListener("click", function () {
-        if (remove.dataset.armed === "true") {
-          deleteEntry(entry.id);
-          return;
-        }
-        remove.dataset.armed = "true";
-        remove.textContent = "Confirm";
-        window.setTimeout(function () {
-          if (!remove.isConnected) return;
-          remove.dataset.armed = "false";
-          remove.textContent = "Remove";
-        }, 2500);
-      });
-      item.append(open, remove);
-      els.logList.append(item);
+      remove.setAttribute("aria-label", "Remove saved workout " + summary.title);
+      item.append(use, remove);
+      els.savedList.append(item);
     });
   }
 
-  function startNewSession() {
-    var dirty = state.draft.notes.trim() || state.draft.accessories.trim() || state.draft.feel;
-    if (dirty && els.newSession.dataset.armed !== "true") {
-      els.newSession.dataset.armed = "true";
-      els.newSession.textContent = "Confirm clear";
-      window.setTimeout(function () {
-        if (els.newSession.dataset.armed !== "true") return;
-        els.newSession.dataset.armed = "false";
-        els.newSession.textContent = "Start a new session";
-      }, 2500);
-      return;
-    }
-    els.newSession.dataset.armed = "false";
-    els.newSession.textContent = "Start a new session";
-    state.draft = program.freshDraft(state.settings, new Date());
-    fillForm();
-    chipSignature = "";
-    updateDerived();
-    persistDraft();
-    flash("Started a new session.");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  function disarm(button, label) {
+    window.setTimeout(function () {
+      if (!button.isConnected) return;
+      if (button.dataset.armed !== "true") return;
+      button.dataset.armed = "false";
+      button.textContent = label;
+    }, 2800);
   }
 
-  function selectMessage() {
+  function addSelectedExercise() {
+    var choice = els.pick.value;
+    if (!choice) {
+      flash("Choose an exercise.");
+      els.pick.focus();
+      return;
+    }
+    var name = choice;
+    if (choice === CUSTOM) {
+      name = els.custom.value.trim();
+      if (!name) {
+        flash("Name the exercise.");
+        els.custom.focus();
+        return;
+      }
+    }
+    var exercise = program.createExercise(name);
+    state.draft.exercises.push(exercise);
+    els.pick.value = "";
+    els.custom.value = "";
+    els.customField.hidden = true;
+    renderExercises();
+    renderPreview();
+    persistDraft();
+    var card = findCard(exercise.id);
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      var input = card.querySelector(".set-weight");
+      if (input) input.focus();
+    }
+  }
+
+  function addSet(exerciseId) {
+    syncFromDom();
+    var exercise = findExercise(exerciseId);
+    if (!exercise) return;
+    var set = program.newSet(exercise.sets);
+    exercise.sets.push(set);
+    renderExercises();
+    renderPreview();
+    persistDraft();
+    var card = findCard(exerciseId);
+    if (!card) return;
+    var rows = card.querySelectorAll(".set-row");
+    var last = rows[rows.length - 1];
+    if (!last) return;
+    var input = last.querySelector(".set-weight");
+    if (input) input.focus();
+  }
+
+  function removeSet(exerciseId, setId, button) {
+    syncFromDom();
+    var exercise = findExercise(exerciseId);
+    if (!exercise) return;
+    var set = findSet(exercise, setId);
+    if (!set) return;
+    if (setHasData(set) && button && button.dataset.armed !== "true") {
+      button.dataset.armed = "true";
+      button.textContent = "OK";
+      disarm(button, "\u00d7");
+      return;
+    }
+    exercise.sets = exercise.sets.filter(function (item) { return item.id !== setId; });
+    renderExercises();
+    renderPreview();
+    persistDraft();
+  }
+
+  function removeExercise(exerciseId, button) {
+    var exercise = findExercise(exerciseId);
+    if (!exercise) return;
+    if (exerciseHasData(exercise) && button.dataset.armed !== "true") {
+      button.dataset.armed = "true";
+      button.textContent = "Confirm";
+      disarm(button, "Remove");
+      return;
+    }
+    state.draft.exercises = state.draft.exercises.filter(function (item) {
+      return item.id !== exerciseId;
+    });
+    renderExercises();
+    renderPreview();
+    persistDraft();
+    flash("Removed " + (exercise.name || "exercise") + ".");
+  }
+
+  function useSaved(id, button) {
+    var entry = null;
+    for (var i = 0; i < state.saved.length; i += 1) {
+      if (state.saved[i].id === id) entry = state.saved[i];
+    }
+    if (!entry) return;
+    if (state.draft.exercises.length && button.dataset.armed !== "true") {
+      button.dataset.armed = "true";
+      var title = button.querySelector(".log-title");
+      if (title) title.textContent = "Replace current exercises?";
+      window.setTimeout(function () {
+        if (!button.isConnected || button.dataset.armed !== "true") return;
+        button.dataset.armed = "false";
+        renderSaved();
+      }, 2800);
+      return;
+    }
+    state.draft.exercises = program.cloneExercises(entry.draft.exercises);
+    state.draft.savedId = null;
+    renderExercises();
+    renderPreview();
+    updateSaveLabel();
+    persistDraft();
+    var summary = program.savedLabel(entry);
+    flash("Started from " + summary.title + ".");
+    if (els.exercises.firstElementChild) {
+      els.exercises.firstElementChild.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function removeSaved(id, button) {
+    if (button.dataset.armed !== "true") {
+      button.dataset.armed = "true";
+      button.textContent = "Confirm";
+      disarm(button, "Remove");
+      return;
+    }
+    state.saved = state.saved.filter(function (entry) { return entry.id !== id; });
+    if (state.draft.savedId === id) {
+      state.draft.savedId = null;
+      persistDraft();
+      updateSaveLabel();
+    }
+    persistSaved();
+    renderSaved();
+    flash("Removed the saved workout.");
+  }
+
+  function saveWorkout() {
+    if (!state.draft.exercises.length) {
+      flash("Add an exercise before saving.");
+      return;
+    }
+    var snapshot = program.normalizeDraft(program.snapshotDraft(state.draft), new Date());
+    snapshot.date = state.draft.date;
+    var existing = null;
+    if (state.draft.savedId) {
+      for (var i = 0; i < state.saved.length; i += 1) {
+        if (state.saved[i].id === state.draft.savedId) existing = state.saved[i];
+      }
+    }
+    if (existing) {
+      existing.draft = snapshot;
+      existing.savedAt = new Date().toISOString();
+      persistSaved();
+      renderSaved();
+      flash("Updated the saved workout.");
+      return;
+    }
+    var id = program.uid();
+    state.saved.unshift({
+      id: id,
+      savedAt: new Date().toISOString(),
+      draft: snapshot,
+    });
+    state.saved = state.saved.slice(0, 40);
+    state.draft.savedId = id;
+    persistSaved();
+    persistDraft();
+    updateSaveLabel();
+    renderSaved();
+    flash("Saved on this phone.");
+  }
+
+  function clearWorkout() {
+    if (state.draft.exercises.length && els.clear.dataset.armed !== "true") {
+      els.clear.dataset.armed = "true";
+      els.clear.textContent = "Confirm clear";
+      disarm(els.clear, "Clear workout");
+      return;
+    }
+    els.clear.dataset.armed = "false";
+    els.clear.textContent = "Clear workout";
+    var date = state.draft.date;
+    state.draft = program.blankDraft(date);
+    renderExercises();
+    renderPreview();
+    updateSaveLabel();
+    persistDraft();
+    flash("Cleared this workout.");
+  }
+
+  function onDate() {
+    var parsed = program.parseISODate(els.date.value);
+    if (Number.isNaN(parsed.getTime())) return;
+    state.draft.date = els.date.value;
+    renderPreview();
+    persistDraft();
+  }
+
+  function onExerciseInput(event) {
+    var target = event.target;
+    var card = target.closest(".exercise");
+    if (!card) return;
+    var exercise = findExercise(card.dataset.id);
+    if (!exercise) return;
+    if (target.classList.contains("ex-name")) {
+      exercise.name = target.value;
+      var remove = card.querySelector("[data-action='remove-exercise']");
+      if (remove) remove.setAttribute("aria-label", "Remove " + (target.value.trim() || "exercise"));
+    } else {
+      var row = target.closest(".set-row");
+      if (!row) return;
+      var set = findSet(exercise, row.dataset.id);
+      if (!set) return;
+      if (target.classList.contains("set-weight")) {
+        set.weight = target.value;
+        var bw = row.querySelector("[data-action='bw']");
+        if (bw) bw.setAttribute("aria-pressed", isBodyweight(target.value) ? "true" : "false");
+      }
+      if (target.classList.contains("set-reps")) set.reps = target.value;
+    }
+    renderPreview();
+    persistDraft();
+  }
+
+  function onExerciseClick(event) {
+    var button = event.target.closest("[data-action]");
+    if (!button || !els.exercises.contains(button)) return;
+    var card = button.closest(".exercise");
+    if (!card) return;
+    var action = button.dataset.action;
+    if (action === "add-set") {
+      addSet(card.dataset.id);
+      return;
+    }
+    if (action === "remove-exercise") {
+      removeExercise(card.dataset.id, button);
+      return;
+    }
+    var row = button.closest(".set-row");
+    if (!row) return;
+    if (action === "remove-set") {
+      removeSet(card.dataset.id, row.dataset.id, button);
+      return;
+    }
+    if (action === "bw") {
+      var exercise = findExercise(card.dataset.id);
+      var set = exercise && findSet(exercise, row.dataset.id);
+      if (!set) return;
+      set.weight = "BW";
+      var input = row.querySelector(".set-weight");
+      if (input) input.value = "BW";
+      button.setAttribute("aria-pressed", "true");
+      renderPreview();
+      persistDraft();
+    }
+  }
+
+  function onSavedClick(event) {
+    var button = event.target.closest("[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "use-saved") useSaved(button.dataset.id, button);
+    if (button.dataset.action === "remove-saved") removeSaved(button.dataset.id, button);
+  }
+
+  function selectPreview() {
     var selection = window.getSelection();
     if (!selection) return;
     var range = document.createRange();
@@ -565,37 +618,26 @@
     return ok;
   }
 
-  function markCopied() {
-    els.copy.textContent = "Copied";
-    flash("Copied. Paste it into the trainer chat.");
-    window.setTimeout(function () {
-      if (els.copy.textContent === "Copied") els.copy.textContent = "Copy message";
-    }, 2500);
-  }
-
-  function markCopyFailed() {
-    selectMessage();
-    els.copy.textContent = "Copy message";
-    flash("Couldn't use the clipboard. The message is selected, so you can copy it by hand.");
-  }
-
-  function copyMessage() {
-    var text = els.message.textContent || "";
+  function copyText(text, button, successLabel, successFlash) {
+    var original = button.dataset.label || button.textContent;
+    button.dataset.label = original;
     var finished = false;
     function succeed() {
       if (finished) return;
       finished = true;
-      markCopied();
+      button.textContent = successLabel;
+      flash(successFlash);
+      window.setTimeout(function () {
+        if (button.textContent === successLabel) button.textContent = original;
+      }, 2200);
     }
     function fail() {
       if (finished) return;
       finished = true;
-      markCopyFailed();
+      selectPreview();
+      button.textContent = original;
+      flash("Couldn't use the clipboard. The preview is selected, so you can copy it by hand.");
     }
-
-    // Start the async clipboard write during the click, before any fallback
-    // focus change. Some browsers leave that promise pending, so the fallback
-    // and a short timeout still update the button.
     var pending = null;
     if (window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
       pending = navigator.clipboard.writeText(text);
@@ -618,113 +660,133 @@
     });
   }
 
-  function cacheElements() {
-    els.form = $("session-form");
-    els.lede = $("lede");
-    els.weekTitle = $("week-title");
-    els.weekRange = $("week-range");
-    els.weekPlan = $("week-plan");
-    els.prevWeek = $("prev-week");
-    els.nextWeek = $("next-week");
-    els.date = $("date");
-    els.offday = $("offday");
-    els.jumpNext = $("jump-next");
-    els.workLabel = $("work-label");
-    els.liftFields = $("lift-fields");
-    els.runFields = $("run-fields");
-    els.planWeight = $("plan-weight");
-    els.planCaption = $("plan-caption");
-    els.matchPlan = $("match-plan");
-    els.weight = $("weight");
-    els.sets = $("sets");
-    els.reps = $("reps");
-    els.accessories = $("accessories");
-    els.accessoryHint = $("accessory-hint");
-    els.distance = $("distance");
-    els.minutes = $("minutes");
-    els.seconds = $("seconds");
-    els.notes = $("notes");
-    els.message = $("message");
-    els.copy = $("copy");
-    els.save = $("save");
-    els.newSession = $("new-session");
-    els.status = $("status");
-    els.logList = $("log-list");
-    els.logEmpty = $("log-empty");
-    els.clearLog = $("clear-log");
-    els.storageNote = $("storage-note");
-    els.tm = $("tm");
-    els.goal = $("goal");
-    els.bump = $("bump");
-    els.roundTo = $("round-to");
-    els.cycleStart = $("cycle-start");
-    els.intensity = $("legs-intensity");
-    els.legsMeta = $("legs-meta");
-    els.sessionButtons = document.querySelectorAll("[data-session]");
-    els.feelButtons = document.querySelectorAll("[data-feel]");
-    els.doneButtons = document.querySelectorAll("[data-done]");
+  function readSessionPending() {
+    try {
+      return parseJSON(sessionStorage.getItem(STORAGE.pending));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearSessionPending() {
+    try {
+      sessionStorage.removeItem(STORAGE.pending);
+    } catch (error) {
+      /* ignore */
+    }
+  }
+
+  function consumePending() {
+    var hasAdd = new URLSearchParams(location.search).get("add") === "1" || location.hash === "#add";
+    if (!hasAdd) return null;
+    var fromQuery = program.pendingFromQuery(location.search);
+    var fromSession = program.coercePending(readSessionPending());
+    var pending = fromQuery || fromSession;
+    clearSessionPending();
+    try {
+      history.replaceState(null, "", location.pathname);
+    } catch (error) {
+      /* file URLs can reject replaceState; the add still applies once */
+    }
+    if (!pending) return null;
+    var exercise = program.applyPending(state.draft, pending);
+    if (!exercise) return null;
+    return { exercise: exercise, mode: pending.mode };
+  }
+
+  function highlightAdded(exercise, mode) {
+    if (!exercise) return;
+    var reps = exercise.sets[0] ? exercise.sets[0].reps : "";
+    var weight = exercise.sets[0] ? exercise.sets[0].weight : "";
+    var lead = mode === "replace" ? "Replaced this workout with " : "Added ";
+    flash(lead + exercise.name + " (" + exercise.sets.length + "\u00d7" + reps + " @ " + weight + " lb).");
+    var card = findCard(exercise.id);
+    if (!card) return;
+    card.classList.add("is-new");
+    window.requestAnimationFrame(function () {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    window.setTimeout(function () {
+      card.classList.remove("is-new");
+    }, 4000);
   }
 
   function bind() {
     els.form.addEventListener("submit", function (event) { event.preventDefault(); });
-    els.form.addEventListener("input", function (event) {
-      var target = event.target;
-      if (target === els.date) return;
-      if (!target || !target.id) return;
-      readDraftFromForm();
-      updateDerived();
-      persistDraft();
+    els.date.addEventListener("input", onDate);
+    els.date.addEventListener("change", onDate);
+    els.pick.addEventListener("change", function () {
+      els.customField.hidden = els.pick.value !== CUSTOM;
+      if (els.pick.value === CUSTOM) els.custom.focus();
     });
-    els.form.addEventListener("wheel", function (event) {
-      var active = document.activeElement;
-      if (active && active.type === "number" && event.target === active) event.preventDefault();
-    }, { passive: false });
-    els.date.addEventListener("change", onDateChange);
-    els.sessionButtons.forEach(function (button) {
-      button.addEventListener("click", function () { selectSession(button.getAttribute("data-session")); });
+    els.add.addEventListener("click", addSelectedExercise);
+    els.custom.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addSelectedExercise();
+      }
     });
-    els.feelButtons.forEach(function (button) {
-      button.addEventListener("click", function () { selectFeel(button.getAttribute("data-feel")); });
+    els.exercises.addEventListener("input", onExerciseInput);
+    els.exercises.addEventListener("click", onExerciseClick);
+    els.savedList.addEventListener("click", onSavedClick);
+    els.save.addEventListener("click", saveWorkout);
+    els.clear.addEventListener("click", clearWorkout);
+    els.copyChat.addEventListener("click", function () {
+      copyText(program.formatChat(state.draft), els.copyChat, "Copied", "Copied for chat.");
     });
-    els.doneButtons.forEach(function (button) {
-      button.addEventListener("click", function () { selectDone(button.getAttribute("data-done")); });
+    els.copySheets.addEventListener("click", function () {
+      copyText(program.formatSheets(state.draft), els.copySheets, "Copied", "Copied for Sheets.");
     });
-    els.prevWeek.addEventListener("click", function () { shiftWeek(-1); });
-    els.nextWeek.addEventListener("click", function () { shiftWeek(1); });
-    els.jumpNext.addEventListener("click", function () {
-      var next = program.nextPlanOnOrAfter(currentDate());
-      if (next) applyPlanSelection(next);
+    window.addEventListener("resize", function () {
+      sizeDock();
+      pinDock();
     });
-    els.matchPlan.addEventListener("click", function () {
-      writePlanNumbers();
-      fillLiftFields();
-      updateDerived();
-      persistDraft();
-    });
-    els.copy.addEventListener("click", copyMessage);
-    els.save.addEventListener("click", saveEntry);
-    els.newSession.addEventListener("click", startNewSession);
-    els.clearLog.addEventListener("click", clearLog);
-    [els.tm, els.goal, els.bump, els.roundTo, els.cycleStart, els.intensity].forEach(function (input) {
-      input.addEventListener("change", commitSettings);
-    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", pinDock);
+      window.visualViewport.addEventListener("scroll", pinDock);
+    }
+  }
+
+  function cacheElements() {
+    els.form = $("workout-form");
+    els.date = $("date");
+    els.pick = $("exercise-pick");
+    els.custom = $("custom-name");
+    els.customField = $("custom-field");
+    els.add = $("add-exercise");
+    els.exercises = $("exercises");
+    els.exerciseEmpty = $("exercise-empty");
+    els.savedList = $("saved-list");
+    els.savedEmpty = $("saved-empty");
+    els.save = $("save");
+    els.clear = $("clear");
+    els.message = $("message");
+    els.copyChat = $("copy-chat");
+    els.copySheets = $("copy-sheets");
+    els.status = $("status");
+    els.storageNote = $("storage-note");
+    els.dock = document.querySelector(".dock");
   }
 
   function boot() {
     cacheElements();
-    state.settings = loadSettings();
-    state.entries = loadEntries();
-    state.draft = coerceDraft(parseJSON(storageGet(STORAGE.draft)), state.settings);
-    if (state.draft.savedId && !state.entries.some(function (entry) { return entry.id === state.draft.savedId; })) {
+    fillExerciseSelect();
+    state.saved = program.normalizeSaved(parseJSON(storageGet(STORAGE.saved)));
+    state.draft = program.normalizeDraft(parseJSON(storageGet(STORAGE.draft)), new Date());
+    if (state.draft.savedId && !state.saved.some(function (entry) { return entry.id === state.draft.savedId; })) {
       state.draft.savedId = null;
     }
+    var added = consumePending();
     bind();
-    fillSettings();
-    fillForm();
-    updateDerived();
-    renderLog();
-    persistSettings();
+    els.date.value = state.draft.date;
+    renderSaved();
+    renderExercises();
+    renderPreview();
+    updateSaveLabel();
     persistDraft();
+    sizeDock();
+    pinDock();
+    if (added) highlightAdded(added.exercise, added.mode);
   }
 
   boot();
