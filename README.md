@@ -5,7 +5,7 @@ A phone-first page for logging a workout and copying it into chat or Google Shee
 ## Workout
 
 1. Open the site. The date starts as today.
-2. Add an exercise from the groups (Upper, Lower, Free weights, Banded, BW, Barbell, Machine), search the list, or type a custom name. The same exercise can show in more than one group. Stack as many as you want.
+2. Add an exercise from the Group and Exercise menus (All, Upper, Lower, Free weights, Banded, BW, Barbell, Machine), or type a custom name. The same exercise can appear in more than one group. Stack as many as you want.
 3. Each exercise is a card. Fill weight and reps. **BW** marks a bodyweight set. **+ Set** copies the last row. Remove a set or the whole card from the row.
 4. The preview sits at the bottom of the page and updates as you type. It is not a floating bar, so the keyboard does not cover the set you are editing. **Copy for chat** copies the note. **Copy for Sheets** copies tab-separated rows.
 5. **Save workout** keeps it on this phone. **Start from saved** copies that workout’s exercises, set counts, and weights into the one you are editing. The date stays whatever you already picked.

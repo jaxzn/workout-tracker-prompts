@@ -217,6 +217,8 @@ select:focus-visible {
 
 select {
   appearance: none;
+  touch-action: manipulation;
+  cursor: pointer;
   background-image:
     linear-gradient(45deg, transparent 50%, var(--accent-text) 50%),
     linear-gradient(135deg, var(--accent-text) 50%, transparent 50%);
@@ -474,48 +476,6 @@ html.file-protocol .file-warning { display: block; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.chips,
-.picks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.chips { margin-top: 0.75rem; }
-
-.chip,
-.pick {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--input);
-  color: var(--ink);
-  border-radius: 999px;
-  min-height: 2.4rem;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.chip[aria-pressed="true"],
-.pick:hover { border-color: var(--line-strong); }
-
-.chip[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-
-.catalog-group { margin-top: 0.85rem; }
-
-.catalog-group h3 {
-  margin: 0 0 0.4rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .preview {

@@ -50,11 +50,17 @@
         <section aria-labelledby="add-label">
           <h2 id="add-label">Add exercise</h2>
           <div class="field tight">
-            <label for="exercise-search">Search</label>
-            <input id="exercise-search" type="search" enterkeyhint="search" placeholder="Name" autocomplete="off">
+            <label for="exercise-group">Group</label>
+            <select id="exercise-group" autocomplete="off">
+              <option value="All">All</option>
+            </select>
           </div>
-          <div class="chips" id="category-chips" role="group" aria-label="Exercise groups"></div>
-          <div id="exercise-catalog"></div>
+          <div class="field">
+            <label for="exercise-pick">Exercise</label>
+            <select id="exercise-pick" autocomplete="off">
+              <option value="">Choose exercise…</option>
+            </select>
+          </div>
           <div class="field">
             <label for="custom-name">Custom name</label>
             <div class="add-row">
@@ -62,7 +68,7 @@
               <button type="button" class="secondary" id="add-exercise">Add</button>
             </div>
           </div>
-          <p class="hint">An exercise can sit in more than one group. <a href="./smolov.html">Smolov Jr</a> can drop a whole day in.</p>
+          <p class="hint">Pick a group, then an exercise. The same lift can be in more than one group. <a href="./smolov.html">Smolov Jr</a> can drop a whole day in.</p>
         </section>
 
         <section aria-labelledby="session-label">

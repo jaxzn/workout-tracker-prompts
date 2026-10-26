@@ -385,6 +385,19 @@ function formatSheets(draft) {
     return names;
   }
 
+  // Sections for the exercise dropdown. "All" repeats a lift under every
+  // group it belongs to. Any other value is one flat group.
+  function exerciseMenu(group) {
+    if (group && group !== "All" && CATEGORIES.indexOf(group) !== -1) {
+      return [{ label: group, names: exercisesInGroup(group) }];
+    }
+    return CATEGORIES.map(function (category) {
+      return { label: category, names: exercisesInGroup(category) };
+    }).filter(function (section) {
+      return section.names.length > 0;
+    });
+  }
+
   function snapshotDraft(draft) {
     return {
       date: draft.date,
@@ -404,6 +417,7 @@ function formatSheets(draft) {
     EXERCISE_CATALOG: EXERCISE_CATALOG,
     EXERCISES: EXERCISES,
     exercisesInGroup: exercisesInGroup,
+    exerciseMenu: exerciseMenu,
     DAYS: DAYS,
     STORAGE: STORAGE,
     MAX_SETS: MAX_SETS,

@@ -28,9 +28,12 @@ test("the workout page is static, phone-first, and not the old split form", () =
   assert.equal(css.includes("position: fixed"), false);
   assert.equal(css.includes("position: sticky"), false);
   assert.match(index, /class="preview"/);
-  assert.match(index, /id="category-chips"/);
+  assert.match(index, /id="exercise-group"/);
+  assert.match(index, /id="exercise-pick"/);
+  assert.match(index, /Choose exercise/);
   assert.match(index, /id="custom-name"/);
-  assert.match(index, /id="exercise-search"/);
+  assert.equal(index.includes("category-chips"), false);
+  assert.equal(index.includes("exercise-search"), false);
   assert.equal(existsSync(join(root, "docs/.nojekyll")), true);
 });
 

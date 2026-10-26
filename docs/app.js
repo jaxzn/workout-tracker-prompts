@@ -144,76 +144,74 @@
     return false;
   }
 
-  function searchQuery() {
-    return els.search.value.trim().toLowerCase();
+  function optionEl(value, label) {
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    return option;
   }
 
-  function catalogMatches() {
-    var query = searchQuery();
-    return program.EXERCISE_CATALOG.filter(function (item) {
-      if (state.category !== "All" && item.groups.indexOf(state.category) === -1) return false;
-      if (query && item.name.toLowerCase().indexOf(query) === -1) return false;
-      return true;
+  function renderGroupSelect() {
+    var selected = state.category || "All";
+    var names = ["All"].concat(program.CATEGORIES);
+    if (names.indexOf(selected) === -1) selected = "All";
+    els.group.replaceChildren();
+    names.forEach(function (name) {
+      els.group.append(optionEl(name, name));
     });
+    els.group.value = selected;
+    state.category = selected;
   }
 
-  function renderChips() {
-    els.chips.replaceChildren();
-    ["All"].concat(program.CATEGORIES).forEach(function (name) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "chip";
-      button.textContent = name;
-      button.setAttribute("aria-pressed", state.category === name ? "true" : "false");
-      button.addEventListener("click", function () {
-        state.category = name;
-        renderChips();
-        renderCatalog();
-      });
-      els.chips.append(button);
-    });
-  }
-
-  function renderGroup(title, items) {
-    var group = document.createElement("div");
-    group.className = "catalog-group";
-    var heading = document.createElement("h3");
-    heading.textContent = title;
-    var picks = document.createElement("div");
-    picks.className = "picks";
-    items.forEach(function (item) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "pick";
-      button.dataset.action = "add-named";
-      button.dataset.name = item.name;
-      button.textContent = item.name;
-      picks.append(button);
-    });
-    group.append(heading, picks);
-    return group;
-  }
-
-  function renderCatalog() {
-    var items = catalogMatches();
-    els.catalog.replaceChildren();
-    if (!items.length) {
-      var empty = document.createElement("p");
-      empty.className = "hint";
-      empty.textContent = "Nothing in this group. Add a custom name.";
-      els.catalog.append(empty);
-      return;
-    }
-    if (state.category === "All" && !searchQuery()) {
-      program.CATEGORIES.forEach(function (category) {
-        var groupItems = items.filter(function (item) {
-          return item.groups.indexOf(category) !== -1;
+  function renderExerciseSelect() {
+    var menu = program.exerciseMenu(state.category);
+    var grouped = state.category === "All";
+    els.exercisePick.replaceChildren();
+    els.exercisePick.append(optionEl("", "Choose exercise\u2026"));
+    if (grouped) {
+      menu.forEach(function (section) {
+        var optgroup = document.createElement("optgroup");
+        optgroup.label = section.label;
+        section.names.forEach(function (name) {
+          optgroup.append(optionEl(name, name));
         });
-        if (groupItems.length) els.catalog.append(renderGroup(category, groupItems));
+        els.exercisePick.append(optgroup);
       });
+    } else {
+      menu.forEach(function (section) {
+        section.names.forEach(function (name) {
+          els.exercisePick.append(optionEl(name, name));
+        });
+      });
+    }
+    els.exercisePick.value = "";
+  }
+
+  function resetExerciseSelect() {
+    els.exercisePick.value = "";
+    if (els.exercisePick.selectedIndex !== 0) els.exercisePick.selectedIndex = 0;
+  }
+
+  function onGroupChange() {
+    state.category = els.group.value || "All";
+    renderExerciseSelect();
+  }
+
+  var exercisePickLock = false;
+
+  function onExerciseChange() {
+    var name = els.exercisePick.value;
+    if (!name || exercisePickLock) {
+      resetExerciseSelect();
       return;
     }
-    els.catalog.append(renderGroup(state.category === "All" ? "Matches" : state.category, items));
+    exercisePickLock = true;
+    resetExerciseSelect();
+    addExerciseNamed(name);
+    window.setTimeout(function () {
+      resetExerciseSelect();
+      exercisePickLock = false;
+    }, 0);
   }
 
   function renderExercises() {
@@ -374,11 +372,14 @@
     renderExercises();
     renderPreview();
     persistDraft();
-    var card = findCard(exercise.id);
-    if (!card) return;
-    var input = card.querySelector(".set-weight");
-    if (input) input.focus({ preventScroll: true });
-    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    // Let the native picker close before the weight field takes focus.
+    window.setTimeout(function () {
+      var card = findCard(exercise.id);
+      if (!card) return;
+      var input = card.querySelector(".set-weight");
+      if (input) input.focus({ preventScroll: true });
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 60);
   }
 
   function addCustomExercise() {
@@ -752,12 +753,8 @@
     els.form.addEventListener("submit", function (event) { event.preventDefault(); });
     els.date.addEventListener("input", onDate);
     els.date.addEventListener("change", onDate);
-    els.search.addEventListener("input", renderCatalog);
-    els.catalog.addEventListener("click", function (event) {
-      var button = event.target.closest("[data-action='add-named']");
-      if (!button || !els.catalog.contains(button)) return;
-      addExerciseNamed(button.dataset.name);
-    });
+    els.group.addEventListener("change", onGroupChange);
+    els.exercisePick.addEventListener("change", onExerciseChange);
     els.add.addEventListener("click", addCustomExercise);
     els.custom.addEventListener("keydown", function (event) {
       if (event.key === "Enter") {
@@ -781,9 +778,8 @@
   function cacheElements() {
     els.form = $("workout-form");
     els.date = $("date");
-    els.search = $("exercise-search");
-    els.chips = $("category-chips");
-    els.catalog = $("exercise-catalog");
+    els.group = $("exercise-group");
+    els.exercisePick = $("exercise-pick");
     els.custom = $("custom-name");
     els.add = $("add-exercise");
     els.exercises = $("exercises");
@@ -801,8 +797,8 @@
 
   function boot() {
     cacheElements();
-    renderChips();
-    renderCatalog();
+    renderGroupSelect();
+    renderExerciseSelect();
     state.saved = program.normalizeSaved(parseJSON(storageGet(STORAGE.saved)));
     state.draft = program.normalizeDraft(parseJSON(storageGet(STORAGE.draft)), new Date());
     if (state.draft.savedId && !state.saved.some(function (entry) { return entry.id === state.draft.savedId; })) {
