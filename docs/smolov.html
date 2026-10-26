@@ -2,62 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Smolov Jr weights from a training max, rounded to the nearest 5 lb.">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#0c0e12">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Smolov Jr">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0; url=./index.html">
+  <link rel="canonical" href="./index.html">
   <title>Smolov Jr</title>
-  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=20261026d">
+  <script>location.replace("./index.html" + location.search + location.hash);</script>
 </head>
 <body>
-  <div class="app">
-    <header class="top">
-      <div class="mark" aria-hidden="true"></div>
-      <nav class="nav" aria-label="Pages">
-        <a href="./index.html">Workout</a>
-        <a href="./smolov.html" aria-current="page">Smolov Jr</a>
-      </nav>
-      <h1>Smolov Jr</h1>
-      <p class="lede">Training max in, bar weight out. Rounded to the nearest 5 lb.</p>
-    </header>
-
-    <p class="banner storage-blocked" id="storage-note" role="alert" hidden>This browser is blocking storage. In Brave, allow cookies or Shields for this site. You can still use the calculator.</p>
-    <noscript><p class="banner">This page needs JavaScript. Nothing you type is uploaded.</p></noscript>
-
-    <main class="stack">
-      <form id="smolov-form" class="card stack" autocomplete="off">
-        <div class="field tight">
-          <label for="lift">Lift</label>
-          <input id="lift" name="lift" type="text" maxlength="80" list="lifts" placeholder="Incline bench">
-          <datalist id="lifts"></datalist>
-        </div>
-        <div class="nums smolov-nums">
-          <div>
-            <label for="tm">Training max</label>
-            <input id="tm" name="tm" type="number" inputmode="decimal" min="1" step="0.5">
-          </div>
-          <div>
-            <label for="bump">Weekly bump</label>
-            <input id="bump" name="bump" type="number" inputmode="decimal" min="0" step="0.5">
-          </div>
-        </div>
-        <p class="hint">Bump defaults to +5 lb. All three weeks are listed. Each later week adds the bump to the training max.</p>
-      </form>
-
-      <section aria-labelledby="week-title">
-        <h2 id="week-title">Three weeks</h2>
-        <p class="plan-caption" id="week-summary"></p>
-        <p class="hint" id="workout-note"></p>
-        <div id="days" class="stack cards"></div>
-      </section>
-
-      <p class="foot"><a href="./index.html">Back to the workout</a>. The calculator works on its own. Add to current workout is the bridge into logging. Nothing is uploaded.</p>
-    </main>
-  </div>
-  <script src="./program.js?v=20261026d"></script>
-  <script src="./smolov.js?v=20261026d"></script>
+  <p><a href="./index.html">Smolov Jr calculator</a></p>
 </body>
 </html>

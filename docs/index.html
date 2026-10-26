@@ -3,102 +3,61 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Log a workout on your phone and copy it into chat or Google Sheets.">
+  <meta name="description" content="Smolov Jr bar weights from a training max, rounded to the nearest 5 lb. Copy any day into your notes.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0c0e12">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Workout">
-  <title>Workout</title>
+  <meta name="apple-mobile-web-app-title" content="Smolov Jr">
+  <title>Smolov Jr</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=20261026d">
+  <link rel="stylesheet" href="./styles.css?v=20261026e">
   <script>
     if (location.protocol === "file:") document.documentElement.classList.add("file-protocol");
   </script>
 </head>
-<body class="page-workout">
+<body>
   <div class="app">
     <header class="top">
       <div class="mark" aria-hidden="true"></div>
-      <nav class="nav" aria-label="Pages">
-        <a href="./index.html" aria-current="page">Workout</a>
-        <a href="./smolov.html">Smolov Jr</a>
-      </nav>
-      <h1>Workout</h1>
-      <p class="lede">Build the session, then copy it into chat or a sheet.</p>
+      <h1>Smolov Jr</h1>
+      <p class="lede">Training max in, bar weight out. Copy a day into your notes.</p>
     </header>
 
-    <p class="banner file-warning">Opened as a file. The form still runs. Copy works more reliably on a local server or GitHub Pages, and you can always select the preview by hand.</p>
-    <p class="banner storage-blocked" id="storage-note" role="alert" hidden>This browser is blocking storage. In Brave, allow cookies or Shields for this site. You can still copy the workout.</p>
-    <noscript><p class="banner">This page needs JavaScript. Nothing you type is uploaded.</p></noscript>
+    <p class="banner file-warning">Opened as a file. Copy works more reliably on GitHub Pages. If Copy fails, select the line under that day.</p>
+    <p class="banner storage-blocked" id="storage-note" role="alert" hidden>This browser is blocking storage. In Brave, allow cookies or Shields for this site. The calculator still runs, and Copy still works. A refresh may forget the training max.</p>
+    <noscript><p class="banner">This page needs JavaScript to round the loads. Nothing you type is uploaded.</p></noscript>
 
     <main class="stack">
-      <form id="workout-form" class="stack" autocomplete="off">
-        <section aria-labelledby="date-label">
-          <div class="field tight">
-            <label for="date" id="date-label">Date</label>
-            <input id="date" name="date" type="date" required>
-          </div>
-        </section>
-
-        <section aria-labelledby="saved-label">
-          <div class="row-between">
-            <h2 id="saved-label">Start from saved</h2>
-          </div>
-          <p class="hint" id="saved-empty">Save a workout and it shows up here. Using one copies the exercises, set counts, and last weights.</p>
-          <ul id="saved-list" class="log"></ul>
-        </section>
-
-        <section aria-labelledby="add-label">
-          <h2 id="add-label">Add exercise</h2>
-          <div class="field tight">
-            <label for="exercise-group">Group</label>
-            <select id="exercise-group" autocomplete="off">
-              <option value="All">All</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="exercise-pick">Exercise</label>
-            <select id="exercise-pick" autocomplete="off">
-              <option value="">Choose exercise…</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="custom-name">Custom name</label>
-            <div class="add-row">
-              <input id="custom-name" type="text" maxlength="80" placeholder="Not in the list" enterkeyhint="done" autocomplete="off">
-              <button type="button" class="secondary" id="add-exercise">Add</button>
-            </div>
-          </div>
-          <p class="hint">Pick a group, then an exercise. The same lift can be in more than one group. <a href="./smolov.html">Smolov Jr</a> can drop a whole day in.</p>
-        </section>
-
-        <section aria-labelledby="session-label">
-          <h2 id="session-label" class="sr-only">Exercises</h2>
-          <p class="hint" id="exercise-empty">No exercises yet.</p>
-          <div id="exercises" class="stack cards"></div>
-        </section>
-
-        <div class="actions">
-          <button type="button" class="secondary" id="save">Save workout</button>
-          <button type="button" class="text-btn" id="clear">Clear workout</button>
+      <form id="smolov-form" class="card stack" autocomplete="off">
+        <div class="field tight">
+          <label for="lift">Lift</label>
+          <input id="lift" name="lift" type="text" maxlength="80" list="lifts" value="Incline bench" placeholder="Incline bench" autocomplete="off">
+          <datalist id="lifts"></datalist>
         </div>
+        <div class="nums smolov-nums">
+          <div>
+            <label for="tm">Training max (lb)</label>
+            <input id="tm" name="tm" type="number" inputmode="decimal" min="1" step="0.5" value="200">
+          </div>
+          <div>
+            <label for="bump">Weekly bump (lb)</label>
+            <input id="bump" name="bump" type="number" inputmode="decimal" min="0" step="0.5" value="5">
+          </div>
+        </div>
+        <p class="hint">Week 1 uses the training max. Each later week adds the bump. Days are 6×6 @ 70%, 7×5 @ 75%, 8×4 @ 80%, and optional 10×3 @ 85%. Loads round to the nearest 5 lb.</p>
       </form>
+
+      <section aria-labelledby="week-title">
+        <h2 id="week-title">Three weeks</h2>
+        <p class="plan-caption" id="week-summary"></p>
+        <div id="days" class="stack cards"></div>
+        <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+      </section>
+
+      <p class="foot">Training max, bump, and lift stay on this phone. Nothing is uploaded. Copy puts that day on the clipboard, for example Week 2 Day 3: Incline bench 8×4 @ 165.</p>
     </main>
-
-    <section class="preview" aria-labelledby="preview-label">
-      <h2 id="preview-label">Preview</h2>
-      <pre id="message" tabindex="0" aria-labelledby="preview-label"></pre>
-      <div class="preview-actions">
-        <button type="button" class="primary" id="copy-chat">Copy for chat</button>
-        <button type="button" class="secondary" id="copy-sheets">Copy for Sheets</button>
-      </div>
-      <p class="status" id="status" role="status"></p>
-    </section>
-
-    <p class="foot">Saved on this phone only, when the browser allows storage. A refresh keeps the workout you are filling in. The preview stays in the page, under the sets.</p>
   </div>
-
-  <script src="./program.js?v=20261026d"></script>
-  <script src="./app.js?v=20261026d"></script>
+  <script src="./program.js?v=20261026e"></script>
+  <script src="./smolov.js?v=20261026e"></script>
 </body>
 </html>

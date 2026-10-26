@@ -25,13 +25,20 @@
   }
 
   var program = globalThis.WorkoutProgram;
-  if (!program || typeof program.smolovCycle !== "function" || typeof program.openBrowserStore !== "function") {
+  if (
+    !program ||
+    typeof program.smolovCycle !== "function" ||
+    typeof program.formatSmolovCopy !== "function" ||
+    typeof program.openBrowserStore !== "function"
+  ) {
     showBootError("Smolov Jr couldn't start. This browser loaded an old script. Refresh the page. In Brave, turn Shields down for this site if the weeks stay blank.");
     return;
   }
 
   var STORAGE = program.STORAGE;
   var els = {};
+  var copyTimer = 0;
+  var copyButton = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -48,13 +55,18 @@
 
   var store = program.openBrowserStore();
 
-  function storageGet(key) {
-    return store.get(key);
-  }
-
   function showStorageNote() {
     if (!els.storageNote) return;
     els.storageNote.hidden = store.kind() !== "none";
+  }
+
+  function retireOldKeys() {
+    var keys = program.RETIRED_KEYS || [];
+    keys.forEach(function (key) {
+      store.remove(key);
+      try { localStorage.removeItem(key); } catch (error) { /* already gone */ }
+      try { sessionStorage.removeItem(key); } catch (error) { /* already gone */ }
+    });
   }
 
   function defaultSettings() {
@@ -62,7 +74,7 @@
   }
 
   function loadSettings() {
-    var raw = parseJSON(storageGet(STORAGE.smolov)) || {};
+    var raw = parseJSON(store.get(STORAGE.smolov)) || {};
     var defaults = defaultSettings();
     return {
       tm: raw.tm == null || raw.tm === "" ? defaults.tm : String(raw.tm),
@@ -89,42 +101,29 @@
     return program.smolovCycle(readSettings());
   }
 
-  function currentDraft() {
-    return program.normalizeDraft(parseJSON(storageGet(STORAGE.draft)), new Date());
-  }
-
-  function workoutNote(draft) {
-    var exercises = draft.exercises || [];
-    if (!exercises.length) return "Nothing in the current workout yet. This starts one.";
-    var names = [];
-    exercises.forEach(function (exercise) {
-      if (exercise.name) names.push(exercise.name);
-    });
-    var shown = names.slice(0, 3).join(", ");
-    if (names.length > 3) shown += " +" + (names.length - 3);
-    var noun = exercises.length === 1 ? "exercise" : "exercises";
-    return "Current workout has " + exercises.length + " " + noun +
-      (shown ? " (" + shown + ")" : "") + ". Adding keeps them.";
-  }
-
   function summaryText(cycle) {
     return cycle.lift + " · " + program.formatNumber(cycle.baseTm) + " lb · +" +
       program.formatNumber(cycle.bump) + " lb each week";
   }
 
-  function renderDays() {
-    var cycle = currentCycle();
-    var draft = currentDraft();
-    var hasWorkout = draft.exercises.length > 0;
-    els.summary.textContent = summaryText(cycle);
-    els.note.textContent = workoutNote(draft);
-    els.days.replaceChildren();
-    cycle.weeks.forEach(function (week) {
-      els.days.append(renderWeek(week, hasWorkout));
-    });
+  function clearCopyTimer() {
+    if (copyTimer) window.clearTimeout(copyTimer);
+    copyTimer = 0;
+    copyButton = null;
   }
 
-  function renderWeek(week, hasWorkout) {
+  function renderDays() {
+    clearCopyTimer();
+    var cycle = currentCycle();
+    els.summary.textContent = summaryText(cycle);
+    els.days.replaceChildren();
+    cycle.weeks.forEach(function (week) {
+      els.days.append(renderWeek(week));
+    });
+    if (els.status) els.status.textContent = "";
+  }
+
+  function renderWeek(week) {
     var block = document.createElement("section");
     block.className = "week-block";
     var heading = document.createElement("h3");
@@ -132,13 +131,14 @@
     var list = document.createElement("div");
     list.className = "week-days";
     week.days.forEach(function (day) {
-      list.append(renderDay(day, week, hasWorkout));
+      list.append(renderDay(day, week));
     });
     block.append(heading, list);
     return block;
   }
 
-  function renderDay(day, week, hasWorkout) {
+  function renderDay(day, week) {
+    var line = program.formatSmolovCopy(week, day);
     var card = document.createElement("article");
     card.className = "card day-line";
 
@@ -162,7 +162,10 @@
     caption.className = "plan-caption";
     caption.textContent = day.sets + "\u00d7" + day.reps + " @ " + day.pctLabel +
       (raw !== rounded ? " · " + raw + "\u2192" + rounded : "");
-    meta.append(kickerRow, caption);
+    var paste = document.createElement("p");
+    paste.className = "paste-line";
+    paste.textContent = line;
+    meta.append(kickerRow, caption, paste);
 
     var figure = document.createElement("p");
     figure.className = "plan-figure";
@@ -172,33 +175,17 @@
     unit.textContent = "lb";
     figure.append(unit);
 
-    var actions = document.createElement("div");
-    actions.className = "day-actions";
-    var add = document.createElement("button");
-    add.type = "button";
-    add.className = "primary";
-    add.dataset.action = "add";
-    add.dataset.week = String(week.week);
-    add.dataset.day = day.id;
-    add.textContent = "Add";
-    add.setAttribute(
-      "aria-label",
-      "Add to current workout: week " + week.week + " " + day.label + ", " +
-        week.lift + " " + rounded + " lb, " + day.sets + " by " + day.reps
-    );
-    actions.append(add);
-    if (hasWorkout) {
-      var replace = document.createElement("button");
-      replace.type = "button";
-      replace.className = "secondary";
-      replace.dataset.action = "replace";
-      replace.dataset.week = String(week.week);
-      replace.dataset.day = day.id;
-      replace.textContent = "Replace";
-      replace.setAttribute("aria-label", "Replace current workout");
-      actions.append(replace);
-    }
-    card.append(meta, figure, actions);
+    var copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "primary copy-btn";
+    copy.dataset.action = "copy";
+    copy.dataset.week = String(week.week);
+    copy.dataset.day = day.id;
+    copy.dataset.label = "Copy";
+    copy.textContent = "Copy";
+    copy.setAttribute("aria-label", "Copy " + line);
+
+    card.append(meta, figure, copy);
     return card;
   }
 
@@ -214,48 +201,139 @@
     return null;
   }
 
-  function openComposer(week, day, mode) {
-    var pending = {
-      mode: mode,
-      name: week.lift,
-      weight: String(day.weight),
-      reps: String(day.reps),
-      sets: String(day.sets),
-    };
-    var query = program.pendingToQuery(pending);
+  function copyWithSelection(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.setAttribute("aria-hidden", "true");
+    area.style.position = "fixed";
+    area.style.top = "0";
+    area.style.left = "0";
+    area.style.width = "1px";
+    area.style.height = "1px";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
     try {
-      sessionStorage.setItem(STORAGE.pending, JSON.stringify(pending));
+      area.focus({ preventScroll: true });
     } catch (error) {
-      /* the query string is enough on its own */
+      area.focus();
     }
-    window.location.href = "./index.html?" + query + "#add";
+    area.select();
+    var ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (error) {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
+
+  function flashStatus(message) {
+    if (!els.status) return;
+    els.status.textContent = message;
+  }
+
+  function rememberLabel(button) {
+    var current = button.getAttribute("aria-label") || "Copy";
+    if (current !== "Copied" && current !== "Couldn't copy") button.dataset.restorableLabel = current;
+  }
+
+  function restoreCopyButton(button) {
+    if (!button || !button.isConnected) return;
+    button.textContent = button.dataset.label || "Copy";
+    button.classList.remove("is-copied");
+    if (button.dataset.restorableLabel) button.setAttribute("aria-label", button.dataset.restorableLabel);
+  }
+
+  function refocus(button) {
+    try {
+      button.focus({ preventScroll: true });
+    } catch (error) {
+      button.focus();
+    }
+  }
+
+  function markCopied(button) {
+    if (copyButton && copyButton !== button) restoreCopyButton(copyButton);
+    if (copyTimer) window.clearTimeout(copyTimer);
+    copyButton = button;
+    rememberLabel(button);
+    button.textContent = "Copied";
+    button.classList.add("is-copied");
+    button.setAttribute("aria-label", "Copied");
+    flashStatus("Copied");
+    refocus(button);
+    copyTimer = window.setTimeout(function () {
+      copyTimer = 0;
+      restoreCopyButton(button);
+      if (copyButton === button) copyButton = null;
+      if (els.status && els.status.textContent === "Copied") els.status.textContent = "";
+    }, 1600);
+  }
+
+  function markFailed(button) {
+    if (copyButton && copyButton !== button) restoreCopyButton(copyButton);
+    if (copyTimer) window.clearTimeout(copyTimer);
+    copyButton = button;
+    rememberLabel(button);
+    button.textContent = "Couldn't copy";
+    button.classList.remove("is-copied");
+    button.setAttribute("aria-label", "Couldn't copy");
+    flashStatus("Couldn't copy. Select the line under that day.");
+    refocus(button);
+    copyTimer = window.setTimeout(function () {
+      copyTimer = 0;
+      restoreCopyButton(button);
+      if (copyButton === button) copyButton = null;
+    }, 2200);
+  }
+
+  function copyText(text, button) {
+    var finished = false;
+    function succeed() {
+      if (finished) return;
+      finished = true;
+      markCopied(button);
+    }
+    function fail() {
+      if (finished) return;
+      finished = true;
+      markFailed(button);
+    }
+    var pending = null;
+    if (window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      pending = navigator.clipboard.writeText(text);
+    }
+    var legacyOk = copyWithSelection(text);
+    if (legacyOk) succeed();
+    if (!pending) {
+      if (!legacyOk) fail();
+      return;
+    }
+    var timer = window.setTimeout(function () {
+      if (!finished) fail();
+    }, 1000);
+    pending.then(function () {
+      window.clearTimeout(timer);
+      succeed();
+    }).catch(function () {
+      window.clearTimeout(timer);
+      if (!finished) fail();
+    });
   }
 
   function onDayClick(event) {
-    var button = event.target.closest("[data-action]");
+    var button = event.target.closest("[data-action='copy']");
     if (!button || !els.days.contains(button)) return;
     var slot = findSlot(button.dataset.week, button.dataset.day);
     if (!slot) return;
-    if (button.dataset.action === "add") {
-      openComposer(slot.week, slot.day, "append");
-      return;
-    }
-    if (button.dataset.action !== "replace") return;
-    if (button.dataset.armed !== "true") {
-      button.dataset.armed = "true";
-      button.textContent = "Confirm";
-      window.setTimeout(function () {
-        if (!button.isConnected || button.dataset.armed !== "true") return;
-        button.dataset.armed = "false";
-        button.textContent = "Replace";
-      }, 2800);
-      return;
-    }
-    openComposer(slot.week, slot.day, "replace");
+    copyText(program.formatSmolovCopy(slot.week, slot.day), button);
   }
 
   function fillLifts() {
-    program.EXERCISES.forEach(function (name) {
+    var lifts = program.LIFTS || [];
+    lifts.forEach(function (name) {
       var option = document.createElement("option");
       option.value = name;
       els.lifts.append(option);
@@ -276,7 +354,6 @@
       if (active && active.type === "number" && event.target === active) event.preventDefault();
     }, { passive: false });
     els.days.addEventListener("click", onDayClick);
-    window.addEventListener("pageshow", renderDays);
   }
 
   function boot() {
@@ -287,9 +364,10 @@
       els.tm = $("tm");
       els.bump = $("bump");
       els.summary = $("week-summary");
-      els.note = $("workout-note");
       els.days = $("days");
+      els.status = $("copy-status");
       els.storageNote = $("storage-note");
+      retireOldKeys();
       showStorageNote();
       fillLifts();
       var settings = loadSettings();
