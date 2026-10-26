@@ -15,6 +15,7 @@ const {
   EXERCISES,
   EXERCISE_CATALOG,
   applyPending,
+  exerciseMenu,
   exercisesInGroup,
   cloneExercises,
   coercePending,
@@ -61,6 +62,19 @@ test("exercise groups overlap where a lift fits more than one", () => {
   assert.deepEqual([...exercisesInGroup("BW")], ["Dips", "Step-downs"]);
   assert.equal(exercisesInGroup("Machine").includes("Lat pulldown"), true);
   assert.equal(EXERCISE_CATALOG.length, EXERCISES.length);
+  const all = [...exerciseMenu("All")].map((section) => ({
+    label: section.label,
+    names: [...section.names],
+  }));
+  assert.equal(all.find((section) => section.label === "Upper").names.includes("Incline bench"), true);
+  assert.equal(all.find((section) => section.label === "Barbell").names.includes("Incline bench"), true);
+  assert.equal(all.find((section) => section.label === "Free weights").names.includes("Incline bench"), true);
+  const banded = [...exerciseMenu("Banded")].map((section) => ({
+    label: section.label,
+    names: [...section.names],
+  }));
+  assert.deepEqual(banded, [{ label: "Banded", names: ["TKE", "Spanish squat"] }]);
+  assert.equal(exerciseMenu("nope")[0].label, "Upper");
 });
 
 test("chat prompt matches the workout note", () => {
