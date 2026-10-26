@@ -2,6 +2,14 @@
   "use strict";
 
   var program = globalThis.WorkoutProgram;
+  if (!program || typeof program.openBrowserStore !== "function" || typeof program.keyboardScrollDelta !== "function") {
+    var stale = document.getElementById("storage-note");
+    if (stale) {
+      stale.hidden = false;
+      stale.textContent = "This page loaded an old script. Refresh. In Brave, turn Shields down for this site if the workout stays blank.";
+    }
+    return;
+  }
   var STORAGE = program.STORAGE;
 
   var state = {
@@ -356,32 +364,98 @@
     }, 2800);
   }
 
-  function motionBehavior() {
-    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "auto";
-    return "smooth";
+  function isSetInput(node) {
+    if (!node || !node.classList) return false;
+    return node.classList.contains("set-weight") || node.classList.contains("set-reps");
   }
 
-  // Keep the active weight/reps field in the visible area above the keyboard.
-  // interactive-widget=resizes-content shrinks the layout when it can; visualViewport
-  // covers the browsers that leave the layout tall and cover the bottom instead.
-  function scrollFieldIntoView(input) {
-    if (!input || typeof input.scrollIntoView !== "function") return;
+  function viewportBox() {
     var viewport = window.visualViewport;
-    var layoutHeight = window.innerHeight || 0;
-    var visibleTop = viewport ? viewport.offsetTop : 0;
-    var visibleHeight = viewport ? viewport.height : layoutHeight;
-    var obscured = Math.max(0, layoutHeight - (visibleTop + visibleHeight));
-    var knownKeyboard = obscured > 40;
-    // Before the keyboard reports its height, reserve the lower half so the
-    // field is not left on the bottom edge that the keyboard is about to cover.
-    var reserve = knownKeyboard ? obscured + 32 : Math.round(visibleHeight * 0.46);
-    input.style.scrollMarginTop = "12px";
-    input.style.scrollMarginBottom = reserve + "px";
-    input.scrollIntoView({
-      behavior: motionBehavior(),
-      block: knownKeyboard ? "nearest" : "center",
-      inline: "nearest",
-    });
+    if (!viewport) return { offsetTop: 0, height: window.innerHeight || 0 };
+    return {
+      offsetTop: viewport.offsetTop || 0,
+      height: viewport.height || window.innerHeight || 0,
+    };
+  }
+
+  function keyboardSpacer() {
+    var spacer = document.getElementById("keyboard-spacer");
+    if (spacer) return spacer;
+    spacer = document.createElement("div");
+    spacer.id = "keyboard-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    document.body.appendChild(spacer);
+    return spacer;
+  }
+
+  function reserveKeyboardSpace(box) {
+    var layoutHeight = window.innerHeight || box.height || 0;
+    var visibleBottom = (box.offsetTop || 0) + (box.height || 0);
+    var cover = Math.max(0, layoutHeight - visibleBottom);
+    var extra = Math.round((box.height || 0) * 0.65);
+    if (cover > 40) extra = Math.max(extra, cover);
+    keyboardSpacer().style.height = extra + "px";
+  }
+
+  function clearKeyboardSpacer() {
+    var spacer = document.getElementById("keyboard-spacer");
+    if (spacer) spacer.style.height = "0px";
+  }
+
+  // Scroll the document (and any overflow parent) so the field sits in the
+  // upper part of the visual viewport. The keyboard often is not open yet
+  // at focus, and the page needs room below the field before it can move up.
+  function placeFieldAboveKeyboard(input) {
+    if (!input || typeof input.getBoundingClientRect !== "function") return;
+    if (!input.isConnected) return;
+    var box = viewportBox();
+    reserveKeyboardSpace(box);
+    var delta = program.keyboardScrollDelta(input.getBoundingClientRect(), box);
+    if (!delta) return;
+    var node = input.parentElement;
+    while (node && node !== document.body && node !== document.documentElement) {
+      var overflowY = window.getComputedStyle(node).overflowY;
+      var scrolls = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+        node.scrollHeight > node.clientHeight + 2;
+      if (scrolls) {
+        node.scrollTop += delta;
+        var rest = program.keyboardScrollDelta(input.getBoundingClientRect(), viewportBox());
+        if (rest) window.scrollBy(0, rest);
+        return;
+      }
+      node = node.parentElement;
+    }
+    window.scrollBy(0, delta);
+  }
+
+  function keepActiveFieldVisible() {
+    var active = document.activeElement;
+    if (!isSetInput(active)) return;
+    placeFieldAboveKeyboard(active);
+  }
+
+  function watchKeyboard(input) {
+    if (!input) return;
+    var viewport = window.visualViewport;
+    var waiting = true;
+    function settle() {
+      if (!input.isConnected) return;
+      placeFieldAboveKeyboard(input);
+    }
+    function onResize() {
+      if (!waiting) return;
+      waiting = false;
+      if (viewport) viewport.removeEventListener("resize", onResize);
+      settle();
+      window.setTimeout(settle, 80);
+    }
+    if (viewport) viewport.addEventListener("resize", onResize);
+    window.setTimeout(function () {
+      if (!waiting) return;
+      waiting = false;
+      if (viewport) viewport.removeEventListener("resize", onResize);
+      settle();
+    }, 700);
   }
 
   function focusWeightField(input) {
@@ -391,19 +465,7 @@
     } catch (error) {
       input.focus();
     }
-    scrollFieldIntoView(input);
-  }
-
-  var viewportScrollTimer = 0;
-
-  function keepActiveFieldVisible() {
-    window.clearTimeout(viewportScrollTimer);
-    viewportScrollTimer = window.setTimeout(function () {
-      var active = document.activeElement;
-      if (!active || !els.exercises || !els.exercises.contains(active)) return;
-      if (active.tagName !== "INPUT") return;
-      scrollFieldIntoView(active);
-    }, 40);
+    watchKeyboard(input);
   }
 
   function addExerciseNamed(name) {
@@ -819,9 +881,13 @@
     els.exercises.addEventListener("input", onExerciseInput);
     els.exercises.addEventListener("click", onExerciseClick);
     els.exercises.addEventListener("focusin", function (event) {
-      var target = event.target;
-      if (!target || target.tagName !== "INPUT") return;
-      scrollFieldIntoView(target);
+      if (!isSetInput(event.target)) return;
+      watchKeyboard(event.target);
+    });
+    els.exercises.addEventListener("focusout", function () {
+      window.setTimeout(function () {
+        if (!isSetInput(document.activeElement)) clearKeyboardSpacer();
+      }, 80);
     });
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", keepActiveFieldVisible);

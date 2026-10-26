@@ -1,7 +1,35 @@
 (function () {
   "use strict";
 
+  function showBootError(message) {
+    var banner = document.getElementById("boot-error");
+    if (!banner) {
+      banner = document.createElement("p");
+      banner.id = "boot-error";
+      banner.className = "banner storage-blocked";
+      banner.setAttribute("role", "alert");
+      var main = document.querySelector("main");
+      if (main && main.parentNode) main.parentNode.insertBefore(banner, main);
+      else document.body.appendChild(banner);
+    }
+    banner.hidden = false;
+    banner.textContent = message;
+    var days = document.getElementById("days");
+    if (days && !days.childElementCount) {
+      var note = document.createElement("p");
+      note.className = "hint";
+      note.id = "days-error";
+      note.textContent = message;
+      days.appendChild(note);
+    }
+  }
+
   var program = globalThis.WorkoutProgram;
+  if (!program || typeof program.smolovCycle !== "function" || typeof program.openBrowserStore !== "function") {
+    showBootError("Smolov Jr couldn't start. This browser loaded an old script. Refresh the page. In Brave, turn Shields down for this site if the weeks stay blank.");
+    return;
+  }
+
   var STORAGE = program.STORAGE;
   var els = {};
 
@@ -252,24 +280,31 @@
   }
 
   function boot() {
-    els.form = $("smolov-form");
-    els.lift = $("lift");
-    els.lifts = $("lifts");
-    els.tm = $("tm");
-    els.bump = $("bump");
-    els.summary = $("week-summary");
-    els.note = $("workout-note");
-    els.days = $("days");
-    els.storageNote = $("storage-note");
-    showStorageNote();
-    fillLifts();
-    var settings = loadSettings();
-    els.lift.value = settings.lift;
-    els.tm.value = settings.tm;
-    els.bump.value = settings.weeklyBump;
-    bind();
-    persistSettings();
-    renderDays();
+    try {
+      els.form = $("smolov-form");
+      els.lift = $("lift");
+      els.lifts = $("lifts");
+      els.tm = $("tm");
+      els.bump = $("bump");
+      els.summary = $("week-summary");
+      els.note = $("workout-note");
+      els.days = $("days");
+      els.storageNote = $("storage-note");
+      showStorageNote();
+      fillLifts();
+      var settings = loadSettings();
+      els.lift.value = settings.lift;
+      els.tm.value = settings.tm;
+      els.bump.value = settings.weeklyBump;
+      bind();
+      persistSettings();
+      renderDays();
+      if (!els.days || !els.days.querySelector(".day-line")) {
+        showBootError("Smolov Jr didn't list the weeks. Refresh the page.");
+      }
+    } catch (error) {
+      showBootError("Smolov Jr couldn't start. Refresh the page. In Brave, turn Shields down for this site if the weeks stay blank.");
+    }
   }
 
   boot();

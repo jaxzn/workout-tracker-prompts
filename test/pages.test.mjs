@@ -18,9 +18,9 @@ test("the workout page is static, phone-first, and not the old split form", () =
   assert.match(index, /Start from saved/);
   assert.match(index, /id="date"/);
   assert.match(index, /href="\.\/smolov\.html"/);
-  assert.match(index, /src="\.\/program\.js"/);
-  assert.match(index, /src="\.\/app\.js"/);
-  assert.match(index, /href="\.\/styles\.css"/);
+  assert.match(index, /src="\.\/program\.js\?v=/);
+  assert.match(index, /src="\.\/app\.js\?v=/);
+  assert.match(index, /href="\.\/styles\.css\?v=/);
   assert.equal(index.includes("Push-Pull"), false);
   assert.equal(index.includes("Smolov + push"), false);
   assert.equal(index.includes("PPL"), false);
@@ -44,8 +44,11 @@ test("the calculator links back and can add a day to the workout", () => {
   const page = read("docs/smolov.html");
   const script = read("docs/smolov.js");
   assert.match(page, /href="\.\/index\.html"/);
-  assert.match(page, /src="\.\/program\.js"/);
-  assert.match(page, /src="\.\/smolov\.js"/);
+  assert.match(page, /src="\.\/program\.js\?v=/);
+  assert.match(page, /src="\.\/smolov\.js\?v=/);
+  assert.match(page, /href="\.\/styles\.css\?v=/);
+  assert.match(script, /showBootError/);
+  assert.match(script, /old script/);
   assert.match(page, /id="tm"/);
   assert.match(page, /id="bump"/);
   assert.match(page, /Three weeks/);
@@ -65,8 +68,10 @@ test("adding an exercise scrolls the weight field above the keyboard", () => {
   const index = read("docs/index.html");
   assert.match(index, /interactive-widget=resizes-content/);
   assert.match(app, /visualViewport/);
-  assert.match(app, /scrollIntoView/);
+  assert.match(app, /scrollBy/);
+  assert.match(app, /keyboardScrollDelta/);
   assert.match(app, /focusWeightField/);
+  assert.match(read("docs/program.js"), /function keyboardScrollDelta/);
   assert.equal(read("docs/styles.css").includes("position: fixed"), false);
   assert.equal(read("docs/styles.css").includes("position: sticky"), false);
 });
