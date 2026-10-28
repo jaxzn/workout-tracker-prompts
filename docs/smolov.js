@@ -39,6 +39,7 @@
   var els = {};
   var copyTimer = 0;
   var copyButton = null;
+  var openWeek = 1;
 
   function $(id) {
     return document.getElementById(id);
@@ -70,7 +71,13 @@
   }
 
   function defaultSettings() {
-    return { tm: "200", weeklyBump: "5", lift: "Incline bench" };
+    return { tm: "200", weeklyBump: "5", lift: "Incline bench", openWeek: 1 };
+  }
+
+  function normalizeOpenWeek(value) {
+    var n = Math.floor(Number(value));
+    if (n === 0 || n === 1 || n === 2 || n === 3) return n;
+    return 1;
   }
 
   function loadSettings() {
@@ -80,6 +87,7 @@
       tm: raw.tm == null || raw.tm === "" ? defaults.tm : String(raw.tm),
       weeklyBump: raw.weeklyBump == null || raw.weeklyBump === "" ? defaults.weeklyBump : String(raw.weeklyBump),
       lift: raw.lift == null || String(raw.lift).trim() === "" ? defaults.lift : String(raw.lift),
+      openWeek: raw.openWeek == null || raw.openWeek === "" ? defaults.openWeek : normalizeOpenWeek(raw.openWeek),
     };
   }
 
@@ -88,6 +96,7 @@
       tm: els.tm.value,
       weeklyBump: els.bump.value,
       lift: els.lift.value,
+      openWeek: openWeek,
     };
   }
 
@@ -120,64 +129,130 @@
     cycle.weeks.forEach(function (week) {
       els.days.append(renderWeek(week));
     });
+    applyOpenWeek();
     if (els.status) els.status.textContent = "";
+  }
+
+  function makeChevron() {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 20 20");
+    svg.setAttribute("class", "chevron");
+    svg.setAttribute("aria-hidden", "true");
+    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M7 4l6 6-6 6");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    svg.append(path);
+    return svg;
   }
 
   function renderWeek(week) {
     var block = document.createElement("section");
     block.className = "week-block";
+    block.dataset.week = String(week.week);
+
     var heading = document.createElement("h3");
-    heading.textContent = "Week " + week.week + " · " + program.formatNumber(week.tm) + " lb";
+    heading.className = "week-heading";
+
+    var toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "week-toggle";
+    toggle.id = "week-toggle-" + week.week;
+    toggle.dataset.action = "toggle-week";
+    toggle.dataset.week = String(week.week);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", "week-panel-" + week.week);
+
+    var name = document.createElement("span");
+    name.className = "week-name";
+    name.textContent = "Week " + week.week;
+
+    var tm = document.createElement("span");
+    tm.className = "week-tm";
+    tm.textContent = program.formatNumber(week.tm) + " lb";
+
+    toggle.append(makeChevron(), name, tm);
+    heading.append(toggle);
+
+    var panel = document.createElement("div");
+    panel.className = "week-panel";
+    panel.id = "week-panel-" + week.week;
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-labelledby", toggle.id);
+    panel.hidden = true;
+
     var list = document.createElement("div");
     list.className = "week-days";
     week.days.forEach(function (day) {
       list.append(renderDay(day, week));
     });
-    block.append(heading, list);
+    panel.append(list);
+    block.append(heading, panel);
     return block;
   }
 
   function renderDay(day, week) {
     var line = program.formatSmolovCopy(week, day);
     var card = document.createElement("article");
-    card.className = "card day-line";
+    card.className = "day-line";
 
-    var meta = document.createElement("div");
-    meta.className = "day-meta";
-    var kickerRow = document.createElement("div");
-    kickerRow.className = "kicker-row";
-    var kicker = document.createElement("p");
-    kicker.className = "kicker";
-    kicker.textContent = day.label;
-    kickerRow.append(kicker);
+    var row = document.createElement("div");
+    row.className = "day-row";
+
+    var main = document.createElement("div");
+    main.className = "day-main";
+
+    var label = document.createElement("span");
+    label.className = "day-label";
+    label.textContent = day.label;
+    main.append(label);
+
     if (day.optional) {
       var badge = document.createElement("span");
       badge.className = "badge";
-      badge.textContent = "Optional";
-      kickerRow.append(badge);
+      var full = document.createElement("span");
+      full.className = "badge-full";
+      full.textContent = "Optional";
+      var short = document.createElement("span");
+      short.className = "badge-short";
+      short.textContent = "Opt";
+      var rest = document.createElement("span");
+      rest.className = "sr-only";
+      rest.textContent = "ional";
+      short.append(rest);
+      badge.append(full, short);
+      main.append(badge);
     }
-    var raw = program.formatNumber(day.raw);
-    var rounded = program.formatNumber(day.weight);
-    var caption = document.createElement("p");
-    caption.className = "plan-caption";
-    caption.textContent = day.sets + "\u00d7" + day.reps + " @ " + day.pctLabel +
-      (raw !== rounded ? " · " + raw + "\u2192" + rounded : "");
-    var paste = document.createElement("p");
-    paste.className = "paste-line";
-    paste.textContent = line;
-    meta.append(kickerRow, caption, paste);
 
-    var figure = document.createElement("p");
-    figure.className = "plan-figure";
-    figure.append(document.createTextNode(rounded + " "));
+    var rounded = program.formatNumber(day.weight);
+    var raw = program.formatNumber(day.raw);
+    var script = document.createElement("span");
+    script.className = "day-script";
+    var rx = document.createElement("span");
+    rx.className = "day-rx";
+    rx.append(document.createTextNode(day.sets + "\u00d7" + day.reps + " @ " + rounded));
     var unit = document.createElement("span");
     unit.className = "unit";
-    unit.textContent = "lb";
-    figure.append(unit);
+    unit.textContent = " lb";
+    rx.append(unit);
+    script.append(rx);
+    if (raw !== rounded) {
+      var drift = document.createElement("span");
+      drift.className = "day-raw";
+      drift.textContent = raw + "\u2192" + rounded;
+      script.append(drift);
+      script.title = day.pctLabel + " of the week is " + raw + " lb, rounded to " + rounded;
+    } else {
+      script.title = day.pctLabel;
+    }
+    main.append(script);
 
     var copy = document.createElement("button");
     copy.type = "button";
-    copy.className = "primary copy-btn";
+    copy.className = "copy-btn";
     copy.dataset.action = "copy";
     copy.dataset.week = String(week.week);
     copy.dataset.day = day.id;
@@ -185,8 +260,28 @@
     copy.textContent = "Copy";
     copy.setAttribute("aria-label", "Copy " + line);
 
-    card.append(meta, figure, copy);
+    row.append(main, copy);
+
+    var paste = document.createElement("p");
+    paste.className = "paste-line";
+    paste.hidden = true;
+    paste.textContent = line;
+
+    card.append(row, paste);
     return card;
+  }
+
+  function applyOpenWeek() {
+    if (!els.days) return;
+    var blocks = els.days.querySelectorAll(".week-block");
+    for (var i = 0; i < blocks.length; i += 1) {
+      var block = blocks[i];
+      var isOpen = Number(block.dataset.week) === openWeek;
+      var toggle = block.querySelector(".week-toggle");
+      var panel = block.querySelector(".week-panel");
+      if (toggle) toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      if (panel) panel.hidden = !isOpen;
+    }
   }
 
   function findSlot(weekNumber, dayId) {
@@ -234,6 +329,31 @@
     els.status.textContent = message;
   }
 
+  function hidePasteLines() {
+    if (!els.days) return;
+    var lines = els.days.querySelectorAll(".paste-line");
+    for (var i = 0; i < lines.length; i += 1) lines[i].hidden = true;
+  }
+
+  function revealPasteLine(button) {
+    var card = button.closest(".day-line");
+    if (!card) return;
+    hidePasteLines();
+    var line = card.querySelector(".paste-line");
+    if (!line) return;
+    line.hidden = false;
+    try {
+      var range = document.createRange();
+      range.selectNodeContents(line);
+      var selection = window.getSelection();
+      if (!selection) return;
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (error) {
+      /* the line stays visible so it can be selected by hand */
+    }
+  }
+
   function rememberLabel(button) {
     var current = button.getAttribute("aria-label") || "Copy";
     if (current !== "Copied" && current !== "Couldn't copy") button.dataset.restorableLabel = current;
@@ -257,6 +377,7 @@
   function markCopied(button) {
     if (copyButton && copyButton !== button) restoreCopyButton(copyButton);
     if (copyTimer) window.clearTimeout(copyTimer);
+    hidePasteLines();
     copyButton = button;
     rememberLabel(button);
     button.textContent = "Copied";
@@ -280,8 +401,9 @@
     button.textContent = "Couldn't copy";
     button.classList.remove("is-copied");
     button.setAttribute("aria-label", "Couldn't copy");
-    flashStatus("Couldn't copy. Select the line under that day.");
+    flashStatus("Couldn't copy. The line under that day is selected.");
     refocus(button);
+    revealPasteLine(button);
     copyTimer = window.setTimeout(function () {
       copyTimer = 0;
       restoreCopyButton(button);
@@ -323,7 +445,20 @@
     });
   }
 
-  function onDayClick(event) {
+  function onToggleWeek(button) {
+    var week = Number(button.dataset.week);
+    if (week !== 1 && week !== 2 && week !== 3) return;
+    openWeek = openWeek === week ? 0 : week;
+    applyOpenWeek();
+    persistSettings();
+  }
+
+  function onDaysClick(event) {
+    var toggle = event.target.closest("[data-action='toggle-week']");
+    if (toggle && els.days.contains(toggle)) {
+      onToggleWeek(toggle);
+      return;
+    }
     var button = event.target.closest("[data-action='copy']");
     if (!button || !els.days.contains(button)) return;
     var slot = findSlot(button.dataset.week, button.dataset.day);
@@ -353,7 +488,7 @@
       var active = document.activeElement;
       if (active && active.type === "number" && event.target === active) event.preventDefault();
     }, { passive: false });
-    els.days.addEventListener("click", onDayClick);
+    els.days.addEventListener("click", onDaysClick);
   }
 
   function boot() {
@@ -371,6 +506,7 @@
       showStorageNote();
       fillLifts();
       var settings = loadSettings();
+      openWeek = settings.openWeek;
       els.lift.value = settings.lift;
       els.tm.value = settings.tm;
       els.bump.value = settings.weeklyBump;

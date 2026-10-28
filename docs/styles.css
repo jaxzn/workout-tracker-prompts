@@ -90,9 +90,6 @@ h2 {
 
 .stack > * + * { margin-top: 1.15rem; }
 
-.cards { display: grid; gap: 0.75rem; }
-.cards > * + * { margin-top: 0; }
-
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -163,98 +160,183 @@ select:focus-visible {
   margin-top: 0.9rem;
 }
 
-.primary {
-  width: 100%;
-  min-height: 2.75rem;
-  border: 0;
-  border-radius: 0.9rem;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 700;
-  transition: background-color 0.15s ease, filter 0.15s ease;
-}
-
-.primary:hover { filter: brightness(1.06); }
-
-.copy-btn.is-copied { filter: brightness(1.12); }
-
-.week-block + .week-block { margin-top: 0.85rem; }
-
-.week-block h3 {
-  margin: 0 0 0.35rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.week-days { display: grid; gap: 0.45rem; }
-
-.day-line {
+.weeks {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.15rem 0.75rem;
-  align-items: center;
-  padding: 0.75rem 0.8rem;
-  border-radius: 0.95rem;
-  box-shadow: none;
-}
-
-.day-line .plan-figure {
-  margin: 0;
-  font-size: 1.45rem;
-  text-align: right;
-}
-
-.day-line .plan-caption {
-  margin: 0.15rem 0 0;
-  font-size: 0.82rem;
-}
-
-.day-line .copy-btn {
-  grid-column: 1 / -1;
-  margin-top: 0.35rem;
-}
-
-.kicker-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 0.5rem;
 }
 
-.kicker {
-  margin: 0;
-  color: var(--accent-text);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.badge {
-  color: var(--muted);
+.week-block {
+  background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  border-radius: 0.95rem;
 }
 
-.plan-figure {
-  margin: 0.25rem 0 0.05rem;
-  font-size: 2.7rem;
+.week-heading {
+  margin: 0;
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 0.95;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.week-toggle {
+  width: 100%;
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.85rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0.95rem;
+  color: var(--ink);
+  text-align: left;
+}
+
+.week-block:has([aria-expanded="true"]) .week-toggle {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.week-toggle:hover { background: rgba(255, 255, 255, 0.03); }
+
+.week-toggle:active { background: rgba(255, 255, 255, 0.05); }
+
+.chevron {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--accent-text);
+  transition: transform 0.15s ease;
+}
+
+.week-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+
+.week-toggle[aria-expanded="true"] .week-name { color: var(--accent-text); }
+
+.week-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.week-tm {
+  flex: none;
+  color: var(--muted);
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
+.week-panel { border-top: 1px solid var(--line); }
+
+.week-days { display: grid; }
+
+.day-line {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.day-line + .day-line { border-top: 1px solid var(--line); }
+
+.day-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.25rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0.35rem 0.2rem 0.85rem;
+}
+
+.day-main {
+  flex: 1 1 auto;
+  min-width: max-content;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding-top: 0.15rem;
+}
+
+.day-label,
+.badge,
+.day-rx { white-space: nowrap; }
+
+.day-label {
+  flex: none;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.day-script {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  line-height: 1.15;
+}
+
+.day-raw {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.copy-btn {
+  flex: none;
+  width: auto;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: 0 0 0 auto;
+  padding: 0.35rem 0.55rem;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.copy-btn:hover { color: var(--ink); }
+
+.copy-btn.is-copied {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.badge-short { display: none; }
+
+.badge {
+  position: relative;
+  flex: none;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
 .unit {
-  font-size: 1rem;
+  font-size: 0.78em;
   font-weight: 650;
   letter-spacing: 0;
   color: var(--muted);
@@ -267,10 +349,14 @@ select:focus-visible {
 }
 
 .paste-line {
-  margin: 0.35rem 0 0;
+  margin: 0 0.75rem 0.65rem;
+  padding: 0.45rem 0.55rem;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
   color: var(--ink);
   font-family: var(--mono);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
   user-select: text;
@@ -305,9 +391,17 @@ html.file-protocol .file-warning { display: block; }
   font-size: 0.85rem;
 }
 
+@media (max-width: 339px) {
+  .badge-full { display: none; }
+  .badge-short { display: inline; }
+}
+
 @media (max-width: 380px) {
   h1 { font-size: 1.85rem; }
-  .day-line .plan-figure { font-size: 1.25rem; }
+  .week-toggle { padding-right: 0.7rem; padding-left: 0.7rem; }
+  .day-row { padding-left: 0.7rem; }
+  .day-script { font-size: 0.9rem; }
+  .copy-btn { padding-right: 0.4rem; padding-left: 0.4rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
