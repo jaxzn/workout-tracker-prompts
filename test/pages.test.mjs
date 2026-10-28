@@ -28,9 +28,9 @@ test("the landing page is only the Smolov Jr calculator", () => {
   assert.match(index, /Three weeks/);
   assert.match(index, /id="copy-status"/);
   assert.match(index, /Week 2 Day 3: Incline bench 8×4 @ 165/);
-  assert.match(index, /src="\.\/program\.js\?v=20261026e"/);
-  assert.match(index, /src="\.\/smolov\.js\?v=20261026e"/);
-  assert.match(index, /href="\.\/styles\.css\?v=20261026e"/);
+  assert.match(index, /src="\.\/program\.js\?v=20261028a"/);
+  assert.match(index, /src="\.\/smolov\.js\?v=20261028a"/);
+  assert.match(index, /href="\.\/styles\.css\?v=20261028a"/);
   assert.match(index, /viewport-fit=cover/);
   assert.match(index, /id="storage-note"/);
   assert.match(index, /allow cookies or Shields/);
@@ -45,8 +45,12 @@ test("the landing page is only the Smolov Jr calculator", () => {
   assert.match(css, /safe-area-inset/);
   assert.match(css, /\.paste-line/);
   assert.match(css, /\.copy-btn/);
+  assert.match(css, /\.week-toggle/);
+  assert.match(css, /\.chevron/);
+  assert.match(css, /\.day-row/);
   assert.equal(css.includes("position: fixed"), false);
   assert.equal(css.includes("position: sticky"), false);
+  assert.equal(css.includes("grid-column: 1 / -1"), false);
   assert.equal(existsSync(join(root, "docs/.nojekyll")), true);
   assert.equal(existsSync(join(root, "docs/app.js")), false);
   assert.match(readme, /Smolov Jr calculator/);
@@ -68,6 +72,11 @@ test("each day can copy its own sets, reps, and weight", () => {
   assert.match(script, /openBrowserStore/);
   assert.match(script, /smolovCycle/);
   assert.match(script, /paste-line/);
+  assert.match(script, /dataset\.action = "toggle-week"/);
+  assert.match(script, /setAttribute\("aria-expanded"/);
+  assert.match(script, /openWeek/);
+  assert.match(script, /selectNodeContents/);
+  assert.equal(script.includes("primary copy-btn"), false);
   assert.match(program, /function formatSmolovCopy/);
   assert.match(program, /6, reps: 6, pct: 0\.7/);
   assert.match(program, /7, reps: 5, pct: 0\.75/);
